@@ -1,0 +1,259 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ParticipantRole {
+  PLAYER
+  ADMIN
+}
+
+enum SystemRole {
+  USER
+  SUPER_ADMIN
+}
+
+enum MemberStatus {
+  INVITED
+  ACTIVE
+  BANNED
+}
+
+enum ContributionStatus {
+  UNPAID
+  PAID
+}
+
+enum MatchStatus {
+  SCHEDULED
+  OPEN
+  LOCKED
+  LIVE
+  FINISHED
+  SCORED
+  VOID
+}
+
+enum MatchStage {
+  GROUP
+  ROUND_OF_32
+  ROUND_OF_16
+  QUARTER_FINAL
+  SEMI_FINAL
+  THIRD_PLACE
+  FINAL
+}
+
+enum MatchWinner {
+  HOME
+  AWAY
+  DRAW
+  UNKNOWN
+}
+
+enum PredictionResultType {
+  PENDING
+  EXACT_SCORE
+  CORRECT_RESULT
+  WRONG
+  VOID
+}
+
+enum AuditEntityType {
+  LEAGUE
+  LEAGUE_MATCH
+  MEMBER
+  EXPORT
+  TEAM
+  MATCH
+  PREDICTION
+  SETTING
+}
+
+model User {
+  id           String      @id @default(cuid())
+  username     String      @unique
+  passcodeHash String      // Shared passcode (password) for the account
+  displayName  String
+  avatarUrl    String?
+  role         SystemRole  @default(USER) // Platform-wide role (SUPER_ADMIN or USER)
+  isActive     Boolean     @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  sessions     Session[]
+  memberships  LeagueMember[]
+  auditLogs    AuditLog[]  @relation("AuditActor")
+
+  @@index([username])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model League {
+  id        String         @id @default(cuid())
+  name      String
+  slug      String         @unique
+  isActive  Boolean        @default(true)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  members       LeagueMember[]
+  leagueMatches LeagueMatch[]
+  settings      AppSetting[]
+  auditLogs     AuditLog[]
+
+  @@index([isActive])
+}
+
+model LeagueMember {
+  id                 String             @id @default(cuid())
+  leagueId           String
+  userId             String
+  nickname           String             // User's display name inside this specific league
+  role               ParticipantRole    @default(PLAYER) // Member's permission in the league (PLAYER or ADMIN)
+  contributionStatus ContributionStatus @default(UNPAID)
+  joinedAt           DateTime           @default(now())
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  league             League             @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  predictions        Prediction[]
+
+  @@unique([leagueId, userId]) // A user can only join a league once
+  @@unique([leagueId, nickname]) // Nicknames must be unique inside the league context
+  @@index([leagueId])
+  @@index([userId])
+  @@index([role])
+}
+
+model Team {
+  id             String    @id @default(cuid())
+  externalTeamId String?   @unique
+  name           String
+  shortName      String?
+  countryCode    String?
+  flagUrl        String?
+  logoUrl        String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  homeMatches    Match[]   @relation("HomeTeam")
+  awayMatches    Match[]   @relation("AwayTeam")
+
+  @@index([name])
+}
+
+model Match {
+  id              String       @id @default(cuid())
+  externalMatchId String?      @unique
+  homeTeamId      String
+  awayTeamId      String
+  kickoffAt       DateTime
+  stage           MatchStage
+  groupName       String?
+  venue           String?
+  status          MatchStatus  @default(SCHEDULED)
+  homeScore       Int?
+  awayScore       Int?
+  winner          MatchWinner  @default(UNKNOWN)
+  resultSource    String?
+  scoredAt        DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  homeTeam        Team         @relation("HomeTeam", fields: [homeTeamId], references: [id])
+  awayTeam        Team         @relation("AwayTeam", fields: [awayTeamId], references: [id])
+  leagueMatches   LeagueMatch[]
+
+  @@index([kickoffAt])
+  @@index([status])
+}
+
+model LeagueMatch {
+  id                  String       @id @default(cuid())
+  leagueId            String
+  matchId             String
+  status              MatchStatus  @default(SCHEDULED)
+  isPredictionEnabled Boolean      @default(false)
+  lockAt              DateTime?
+  openedAt            DateTime?
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  league              League       @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  match               Match        @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  predictions         Prediction[]
+
+  @@unique([leagueId, matchId])
+  @@index([leagueId])
+  @@index([matchId])
+}
+
+model Prediction {
+  id               String               @id @default(cuid())
+  leagueMatchId    String
+  memberId         String               // Linked to LeagueMember
+  homeScorePred    Int
+  awayScorePred    Int
+  points           Int                  @default(0)
+  resultType       PredictionResultType @default(PENDING)
+  lockedSnapshotAt DateTime?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  leagueMatch      LeagueMatch          @relation(fields: [leagueMatchId], references: [id], onDelete: Cascade)
+  member           LeagueMember         @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([leagueMatchId, memberId])
+  @@index([leagueMatchId])
+  @@index([memberId])
+}
+
+model AppSetting {
+  id        String   @id @default(cuid())
+  leagueId  String
+  key       String
+  value     Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  league    League   @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+
+  @@unique([leagueId, key])
+}
+
+model AuditLog {
+  id          String          @id @default(cuid())
+  leagueId    String?
+  actorId     String?
+  entityType  AuditEntityType
+  entityId    String
+  action      String
+  before      Json?
+  after       Json?
+  createdAt   DateTime        @default(now())
+
+  league      League?         @relation(fields: [leagueId], references: [id], onDelete: SetNull)
+  actor       User?           @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([leagueId])
+  @@index([actorId])
+}

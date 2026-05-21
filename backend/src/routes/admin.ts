@@ -1,0 +1,455 @@
+import type { FastifyInstance } from "fastify";
+import z from "zod";
+import { prisma } from "../lib/prisma.js";
+import { scoreMatch } from "../lib/scoring.js";
+import {
+  PREDICTION_LOCK_SETTING_KEY,
+  getLeagueLockAt,
+  getLeaguePredictionLockMinutes,
+  getLockAt,
+  refreshLeagueMatchStatuses
+} from "../lib/league-match-state.js";
+
+const addMemberSchema = z.object({
+  username: z.string().min(1),
+  nickname: z.string().optional(),
+  role: z.enum(["PLAYER", "ADMIN"]).default("PLAYER")
+});
+
+const updateScoreSchema = z.object({
+  homeScore: z.number().min(0),
+  awayScore: z.number().min(0),
+});
+
+const updateSettingsSchema = z.object({
+  predictionLockMinutes: z.number().int().min(0).max(24 * 60)
+});
+
+export async function adminRoutes(app: FastifyInstance) {
+  // ─── Member Management (Mapped to /admin/participants for frontend compatibility) ───
+
+  app.get("/admin/participants", { preHandler: [app.requireAdmin] }, async (request) => {
+    const leagueId = request.leagueMember?.leagueId || (request.headers["x-league-id"] as string);
+    
+    if (!leagueId) {
+      return { participants: [] };
+    }
+
+    const members = await prisma.leagueMember.findMany({
+      where: { leagueId },
+      include: {
+        user: {
+          select: {
+            username: true,
+            displayName: true,
+            role: true
+          }
+        }
+      },
+      orderBy: { createdAt: "desc" }
+    });
+
+    // Map to compat shape for frontend
+    const mapped = members.map(m => ({
+      id: m.id,
+      nickname: m.nickname,
+      role: m.role,
+      contributionStatus: m.contributionStatus,
+      joinedAt: m.joinedAt,
+      createdAt: m.createdAt,
+      username: m.user.username,
+      displayName: m.user.displayName,
+      isActive: true // Member is always active
+    }));
+
+    return { participants: mapped };
+  });
+
+  app.post("/admin/participants", { preHandler: [app.requireAdmin] }, async (request, reply) => {
+    const { username, nickname, role } = addMemberSchema.parse(request.body);
+    const leagueId = request.leagueMember!.leagueId;
+
+    const user = await prisma.user.findUnique({
+      where: { username: username.trim().toLowerCase() }
+    });
+
+    if (!user) {
+      return reply.status(404).send({ error: "Not Found", message: `Không tìm thấy tài khoản với username: ${username}. Hãy bảo người chơi đăng ký tài khoản trước.` });
+    }
+
+    try {
+      const member = await prisma.leagueMember.create({
+        data: {
+          leagueId,
+          userId: user.id,
+          nickname: nickname?.trim() || user.displayName,
+          role
+        },
+        include: {
+          user: true
+        }
+      });
+
+      return {
+        participant: {
+          id: member.id,
+          nickname: member.nickname,
+          role: member.role,
+          contributionStatus: member.contributionStatus,
+          username: member.user.username,
+          displayName: member.user.displayName
+        },
+        message: `Đã thêm ${member.nickname} vào giải đấu.`
+      };
+    } catch (e) {
+      return reply.status(400).send({ error: "Bad Request", message: "Không thể thêm người chơi (có thể người chơi đã ở trong giải đấu này hoặc bị trùng nickname)" });
+    }
+  });
+
+  // Toggle contribution status (PAID/UNPAID)
+  app.put("/admin/participants/:memberId/toggle-contribution", { preHandler: [app.requireAdmin] }, async (request, reply) => {
+    const { memberId } = request.params as { memberId: string };
+    const leagueId = request.leagueMember!.leagueId;
+
+    const member = await prisma.leagueMember.findFirst({
+      where: { id: memberId, leagueId }
+    });
+
+    if (!member) {
+      return reply.status(404).send({ error: "Not Found", message: "Không tìm thấy thành viên trong League" });
+    }
+
+    const nextStatus = member.contributionStatus === "PAID" ? "UNPAID" : "PAID";
+
+    const updated = await prisma.leagueMember.update({
+      where: { id: memberId },
+      data: { contributionStatus: nextStatus }
+    });
+
+    return {
+      participant: {
+        id: updated.id,
+        nickname: updated.nickname,
+        role: updated.role,
+        contributionStatus: updated.contributionStatus
+      },
+      message: `Đã cập nhật trạng thái đóng quỹ thành ${nextStatus === "PAID" ? "Đã đóng" : "Chưa đóng"}`
+    };
+  });
+
+  // Remove member from League
+  app.delete("/admin/participants/:memberId", { preHandler: [app.requireAdmin] }, async (request, reply) => {
+    const { memberId } = request.params as { memberId: string };
+    const leagueId = request.leagueMember!.leagueId;
+
+    const member = await prisma.leagueMember.findFirst({
+      where: { id: memberId, leagueId }
+    });
+
+    if (!member) {
+      return reply.status(404).send({ error: "Not Found", message: "Không tìm thấy thành viên trong League" });
+    }
+
+    await prisma.leagueMember.delete({
+      where: { id: memberId }
+    });
+
+    return {
+      success: true,
+      message: `Đã xóa ${member.nickname} khỏi giải đấu.`
+    };
+  });
+
+  // Mock route for compatibility (in global password system, league admins cannot reset passcodes)
+  app.post("/admin/participants/:memberId/reset-passcode", { preHandler: [app.requireAdmin] }, async (request, reply) => {
+    return reply.status(400).send({ 
+      error: "Bad Request", 
+      message: "Trong hệ thống tài khoản toàn cục, người chơi tự quản lý mật khẩu của họ. League Admin không thể reset mật khẩu." 
+    });
+  });
+
+  // ─── Match Management ───
+
+  app.put("/admin/matches/:leagueMatchId/toggle-prediction", { preHandler: [app.requireAdmin] }, async (request, reply) => {
+    const { leagueMatchId } = request.params as { leagueMatchId: string };
+    const { isPredictionEnabled } = z.object({ isPredictionEnabled: z.boolean() }).parse(request.body);
+    const leagueId = request.leagueMember!.leagueId;
+
+    await refreshLeagueMatchStatuses(leagueId);
+
+    const leagueMatch = await prisma.leagueMatch.findFirst({
+      where: {
+        id: leagueMatchId,
+        leagueId
+      },
+      include: { match: true }
+    });
+
+    if (!leagueMatch) {
+      return reply.status(404).send({ error: "Not Found", message: "Trận đấu không tồn tại" });
+    }
+
+    if (["LIVE", "FINISHED", "SCORED", "VOID"].includes(leagueMatch.status)) {
+      return reply.status(400).send({ error: "Bad Request", message: "Không thể thay đổi dự đoán cho trận đã bắt đầu hoặc đã kết thúc" });
+    }
+
+    if (leagueMatch.status === "LOCKED" && !isPredictionEnabled) {
+      return reply.status(400).send({ error: "Bad Request", message: "Trận đã khóa dự đoán, không thể đóng. Kết quả dự đoán đã khóa sẽ được giữ để tính điểm." });
+    }
+
+    const lockAt = leagueMatch.lockAt ?? await getLeagueLockAt(leagueId, leagueMatch.match.kickoffAt);
+
+    if (isPredictionEnabled && lockAt <= new Date()) {
+      return reply.status(400).send({ error: "Bad Request", message: "Trận đã qua thời điểm khóa dự đoán" });
+    }
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const leagueMatchUpdated = await tx.leagueMatch.update({
+        where: { id: leagueMatchId },
+        data: {
+          isPredictionEnabled,
+          status: isPredictionEnabled
+            ? "OPEN"
+            : leagueMatch.status === "OPEN"
+              ? "SCHEDULED"
+              : leagueMatch.status,
+          lockAt: isPredictionEnabled ? lockAt : leagueMatch.lockAt,
+          openedAt: isPredictionEnabled ? (leagueMatch.openedAt ?? new Date()) : leagueMatch.openedAt
+        }
+      });
+
+      if (!isPredictionEnabled) {
+        await tx.prediction.updateMany({
+          where: { leagueMatchId },
+          data: {
+            points: 0,
+            resultType: "VOID"
+          }
+        });
+      }
+
+      return leagueMatchUpdated;
+    });
+
+    return { leagueMatch: updated, message: `Đã ${isPredictionEnabled ? "mở" : "đóng"} dự đoán` };
+  });
+
+  app.put("/admin/matches/:leagueMatchId/lock-prediction", { preHandler: [app.requireAdmin] }, async (request, reply) => {
+    const { leagueMatchId } = request.params as { leagueMatchId: string };
+    const leagueId = request.leagueMember!.leagueId;
+
+    await refreshLeagueMatchStatuses(leagueId);
+
+    const leagueMatch = await prisma.leagueMatch.findFirst({
+      where: {
+        id: leagueMatchId,
+        leagueId
+      }
+    });
+
+    if (!leagueMatch) {
+      return reply.status(404).send({ error: "Not Found", message: "Trận đấu không tồn tại" });
+    }
+
+    if (!leagueMatch.isPredictionEnabled) {
+      return reply.status(400).send({ error: "Bad Request", message: "Trận chưa được mở dự đoán" });
+    }
+
+    if (["LIVE", "FINISHED", "SCORED", "VOID"].includes(leagueMatch.status)) {
+      return reply.status(400).send({ error: "Bad Request", message: "Trận đã bắt đầu hoặc đã kết thúc" });
+    }
+
+    const updated = await prisma.leagueMatch.update({
+      where: { id: leagueMatchId },
+      data: {
+        status: "LOCKED",
+        lockAt: new Date()
+      }
+    });
+
+    return { leagueMatch: updated, message: "Đã khóa dự đoán thủ công" };
+  });
+
+  app.put("/admin/matches/:leagueMatchId/unlock-prediction", { preHandler: [app.requireAdmin] }, async (request, reply) => {
+    const { leagueMatchId } = request.params as { leagueMatchId: string };
+    const leagueId = request.leagueMember!.leagueId;
+
+    await refreshLeagueMatchStatuses(leagueId);
+
+    const leagueMatch = await prisma.leagueMatch.findFirst({
+      where: {
+        id: leagueMatchId,
+        leagueId
+      },
+      include: { match: true }
+    });
+
+    if (!leagueMatch) {
+      return reply.status(404).send({ error: "Not Found", message: "Trận đấu không tồn tại" });
+    }
+
+    if (leagueMatch.status !== "LOCKED") {
+      return reply.status(400).send({ error: "Bad Request", message: "Chỉ có thể mở khóa trận đang LOCKED" });
+    }
+
+    if (!leagueMatch.isPredictionEnabled) {
+      return reply.status(400).send({ error: "Bad Request", message: "Trận chưa được mở dự đoán" });
+    }
+
+    const lockAt = await getLeagueLockAt(leagueId, leagueMatch.match.kickoffAt);
+
+    if (lockAt <= new Date() || leagueMatch.match.kickoffAt <= new Date()) {
+      return reply.status(400).send({ error: "Bad Request", message: "Trận đã qua thời điểm khóa dự đoán hoặc đã bắt đầu" });
+    }
+
+    const updated = await prisma.leagueMatch.update({
+      where: { id: leagueMatchId },
+      data: {
+        status: "OPEN",
+        lockAt
+      }
+    });
+
+    return { leagueMatch: updated, message: "Đã mở khóa dự đoán" };
+  });
+
+  app.put("/admin/matches/:matchId/score", { preHandler: [app.requireAdmin] }, async (request, reply) => {
+    const { matchId } = request.params as { matchId: string };
+    const { homeScore, awayScore } = updateScoreSchema.parse(request.body);
+    const leagueId = request.leagueMember!.leagueId;
+
+    await refreshLeagueMatchStatuses(leagueId);
+
+    const leagueMatch = await prisma.leagueMatch.findFirst({
+      where: {
+        leagueId,
+        matchId
+      },
+      include: { match: true }
+    });
+
+    if (!leagueMatch) {
+      return reply.status(404).send({ error: "Not Found", message: "Trận đấu không tồn tại trong League" });
+    }
+
+    if (leagueMatch.match.kickoffAt > new Date()) {
+      return reply.status(400).send({ error: "Bad Request", message: "Chưa thể nhập tỉ số cho trận chưa bắt đầu" });
+    }
+
+    if (leagueMatch.match.status === "SCORED") {
+      return reply.status(409).send({ error: "Conflict", message: "Trận đấu đã được chấm điểm. Không thể cập nhật tỉ số sau khi đã tính điểm dự đoán." });
+    }
+
+    const match = await prisma.match.update({
+      where: { id: matchId },
+      data: { homeScore, awayScore }
+    });
+
+    await scoreMatch(match.id);
+
+    return { match, message: "Đã cập nhật tỉ số và chấm điểm thành công!" };
+  });
+
+  // ─── Settings Management ───
+  
+  app.get("/admin/settings", { preHandler: [app.requireAdmin] }, async (request) => {
+    const leagueId = request.leagueMember!.leagueId;
+    const predictionLockMinutes = await getLeaguePredictionLockMinutes(leagueId);
+
+    return {
+      settings: {
+        predictionLockMinutes
+      }
+    };
+  });
+
+  app.put("/admin/settings", { preHandler: [app.requireAdmin] }, async (request) => {
+    const leagueId = request.leagueMember!.leagueId;
+    const { predictionLockMinutes } = updateSettingsSchema.parse(request.body);
+
+    await prisma.$transaction(async (tx) => {
+      await tx.appSetting.upsert({
+        where: {
+          leagueId_key: {
+            leagueId,
+            key: PREDICTION_LOCK_SETTING_KEY
+          }
+        },
+        update: {
+          value: predictionLockMinutes
+        },
+        create: {
+          leagueId,
+          key: PREDICTION_LOCK_SETTING_KEY,
+          value: predictionLockMinutes
+        }
+      });
+
+      const openMatches = await tx.leagueMatch.findMany({
+        where: {
+          leagueId,
+          status: "OPEN",
+          isPredictionEnabled: true
+        },
+        include: { match: true }
+      });
+
+      await Promise.all(
+        openMatches.map((leagueMatch) =>
+          tx.leagueMatch.update({
+            where: { id: leagueMatch.id },
+            data: {
+              lockAt: getLockAt(leagueMatch.match.kickoffAt, predictionLockMinutes)
+            }
+          })
+        )
+      );
+    });
+
+    return {
+      settings: {
+        predictionLockMinutes
+      },
+      message: "Đã cập nhật cài đặt"
+    };
+  });
+
+  // Sync matches from external API
+  app.post("/admin/sync-matches", { preHandler: [app.requireAdmin] }, async (request) => {
+    const leagueId = request.leagueMember!.leagueId;
+
+    // Step 1: Sync global matches from Football-Data.org
+    const { fetchWorldCupMatches } = await import("../lib/football-api.js");
+    await fetchWorldCupMatches();
+
+    // Step 2: Auto-create LeagueMatch records for this league
+    const allGlobalMatches = await prisma.match.findMany({
+      select: { id: true }
+    });
+
+    const existingLeagueMatches = await prisma.leagueMatch.findMany({
+      where: { leagueId },
+      select: { matchId: true }
+    });
+
+    const existingMatchIds = new Set(existingLeagueMatches.map(lm => lm.matchId));
+    const newMatches = allGlobalMatches.filter(m => !existingMatchIds.has(m.id));
+
+    if (newMatches.length > 0) {
+      await prisma.leagueMatch.createMany({
+        data: newMatches.map(m => ({
+          leagueId,
+          matchId: m.id,
+          isPredictionEnabled: false,
+          status: "SCHEDULED"
+        })),
+        skipDuplicates: true
+      });
+    }
+
+    return {
+      ok: true,
+      message: `Đồng bộ thành công! ${newMatches.length} trận mới được thêm vào giải đấu.`
+    };
+  });
+}

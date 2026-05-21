@@ -1,0 +1,1567 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Fan League UI Prototype</title>
+    <style>
+      :root {
+        --bg: #f8f7f2;
+        --surface: #ffffff;
+        --surface-2: #f2f6f3;
+        --primary: #2f7d5c;
+        --primary-strong: #236044;
+        --accent: #f4a261;
+        --text: #1f2937;
+        --muted: #6b7280;
+        --line: #e5e7eb;
+        --success: #16a34a;
+        --warning: #d97706;
+        --danger: #dc2626;
+        --info: #2563eb;
+        --shadow: 0 12px 30px rgba(31, 41, 55, 0.08);
+        --radius: 8px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", sans-serif;
+        line-height: 1.45;
+      }
+
+      button,
+      input,
+      select,
+      textarea {
+        font: inherit;
+      }
+
+      button {
+        cursor: pointer;
+      }
+
+      .app {
+        min-height: 100vh;
+        display: grid;
+        grid-template-columns: 280px minmax(0, 1fr);
+      }
+
+      .sidebar {
+        position: sticky;
+        top: 0;
+        height: 100vh;
+        padding: 20px;
+        background: #fffdf8;
+        border-right: 1px solid var(--line);
+        overflow-y: auto;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 18px;
+      }
+
+      .brand-mark {
+        width: 38px;
+        height: 38px;
+        display: grid;
+        place-items: center;
+        color: white;
+        background: var(--primary);
+        border-radius: var(--radius);
+        font-weight: 800;
+      }
+
+      .brand h1 {
+        margin: 0;
+        font-size: 20px;
+        letter-spacing: 0;
+      }
+
+      .brand p {
+        margin: 2px 0 0;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .profile-pill {
+        display: grid;
+        grid-template-columns: 38px minmax(0, 1fr);
+        gap: 10px;
+        align-items: center;
+        padding: 12px;
+        background: var(--surface-2);
+        border: 1px solid #dce7df;
+        border-radius: var(--radius);
+        margin-bottom: 18px;
+      }
+
+      .avatar {
+        width: 38px;
+        height: 38px;
+        display: grid;
+        place-items: center;
+        border-radius: 50%;
+        background: #dff0e6;
+        color: var(--primary-strong);
+        font-weight: 800;
+      }
+
+      .profile-pill strong,
+      .profile-pill span {
+        display: block;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .profile-pill span {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .nav-section {
+        margin-top: 18px;
+      }
+
+      .nav-title {
+        margin: 0 0 8px;
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      .nav-button {
+        width: 100%;
+        min-height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 9px 10px;
+        margin: 4px 0;
+        color: var(--text);
+        background: transparent;
+        border: 1px solid transparent;
+        border-radius: var(--radius);
+        text-align: left;
+      }
+
+      .nav-button:hover {
+        background: #f5f4ef;
+      }
+
+      .nav-button.active {
+        background: #e7f2eb;
+        border-color: #c9e3d2;
+        color: var(--primary-strong);
+        font-weight: 800;
+      }
+
+      .nav-left {
+        display: inline-flex;
+        align-items: center;
+        gap: 9px;
+        min-width: 0;
+      }
+
+      .nav-left span:last-child {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .main {
+        min-width: 0;
+      }
+
+      .topbar {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        min-height: 66px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        padding: 14px 24px;
+        background: rgba(248, 247, 242, 0.88);
+        border-bottom: 1px solid rgba(229, 231, 235, 0.85);
+        backdrop-filter: blur(10px);
+      }
+
+      .mobile-menu {
+        display: none;
+      }
+
+      .topbar h2 {
+        margin: 0;
+        font-size: 20px;
+      }
+
+      .topbar p {
+        margin: 2px 0 0;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .top-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+      }
+
+      .content {
+        padding: 24px;
+      }
+
+      .screen {
+        display: none;
+      }
+
+      .screen.active {
+        display: block;
+      }
+
+      .grid {
+        display: grid;
+        gap: 16px;
+      }
+
+      .grid.cols-2 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .grid.cols-3 {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .grid.cols-4 {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+      }
+
+      .card-pad {
+        padding: 18px;
+      }
+
+      .section-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 14px;
+      }
+
+      .section-head h3 {
+        margin: 0;
+        font-size: 17px;
+      }
+
+      .section-head p {
+        margin: 4px 0 0;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .muted {
+        color: var(--muted);
+      }
+
+      .small {
+        font-size: 12px;
+      }
+
+      .btn {
+        min-height: 38px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 8px 12px;
+        border: 1px solid transparent;
+        border-radius: var(--radius);
+        background: #f3f4f6;
+        color: var(--text);
+        font-weight: 750;
+        text-decoration: none;
+      }
+
+      .btn:hover {
+        filter: brightness(0.98);
+      }
+
+      .btn.primary {
+        background: var(--primary);
+        color: #fff;
+      }
+
+      .btn.ghost {
+        background: transparent;
+        border-color: var(--line);
+      }
+
+      .btn.warning {
+        background: #fff7ed;
+        border-color: #fed7aa;
+        color: #9a3412;
+      }
+
+      .btn.danger {
+        background: #fef2f2;
+        border-color: #fecaca;
+        color: #991b1b;
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        min-height: 24px;
+        padding: 3px 8px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: #f9fafb;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 800;
+        white-space: nowrap;
+      }
+
+      .badge.open {
+        background: #e7f6ec;
+        border-color: #bde5ca;
+        color: #166534;
+      }
+
+      .badge.live {
+        background: #fef2f2;
+        border-color: #fecaca;
+        color: #b91c1c;
+      }
+
+      .badge.locked {
+        background: #eff6ff;
+        border-color: #bfdbfe;
+        color: #1d4ed8;
+      }
+
+      .badge.warning {
+        background: #fff7ed;
+        border-color: #fed7aa;
+        color: #9a3412;
+      }
+
+      .badge.scored {
+        background: #ecfdf5;
+        border-color: #bbf7d0;
+        color: #047857;
+      }
+
+      .badge.void {
+        background: #f3f4f6;
+        border-color: #d1d5db;
+        color: #4b5563;
+      }
+
+      .kpi {
+        display: grid;
+        gap: 8px;
+      }
+
+      .kpi-label {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .kpi-value {
+        font-size: 28px;
+        font-weight: 900;
+      }
+
+      .kpi-foot {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .match-card {
+        display: grid;
+        gap: 14px;
+      }
+
+      .match-meta {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: center;
+      }
+
+      .teams {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+        align-items: center;
+        gap: 12px;
+      }
+
+      .team {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
+      }
+
+      .team.away {
+        justify-content: flex-end;
+        text-align: right;
+      }
+
+      .team-name {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-weight: 850;
+      }
+
+      .flag {
+        width: 38px;
+        height: 38px;
+        display: grid;
+        place-items: center;
+        background: #f3f4f6;
+        border: 1px solid var(--line);
+        border-radius: 50%;
+        font-size: 20px;
+        flex: 0 0 auto;
+      }
+
+      .scoreline {
+        min-width: 86px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 9px;
+        padding: 9px 12px;
+        background: #f9fafb;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        font-size: 18px;
+        font-weight: 900;
+      }
+
+      .card-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        flex-wrap: wrap;
+        padding-top: 12px;
+        border-top: 1px solid var(--line);
+      }
+
+      .tabs {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-bottom: 16px;
+      }
+
+      .tab {
+        min-height: 36px;
+        padding: 8px 12px;
+        color: var(--muted);
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        font-weight: 800;
+      }
+
+      .tab.active {
+        color: var(--primary-strong);
+        background: #e7f2eb;
+        border-color: #c9e3d2;
+      }
+
+      .table-wrap {
+        overflow-x: auto;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+      }
+
+      table {
+        width: 100%;
+        min-width: 680px;
+        border-collapse: collapse;
+        background: #fff;
+      }
+
+      th,
+      td {
+        padding: 12px 14px;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+        vertical-align: middle;
+      }
+
+      th {
+        color: var(--muted);
+        background: #fbfbf9;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+
+      tr:last-child td {
+        border-bottom: 0;
+      }
+
+      tr.me td {
+        background: #f0f8f3;
+      }
+
+      .qualify td {
+        background: #f0fdf4;
+      }
+
+      .bubble {
+        display: inline-grid;
+        place-items: center;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: #f3f4f6;
+        font-weight: 900;
+      }
+
+      .form-grid {
+        display: grid;
+        gap: 12px;
+      }
+
+      .field label {
+        display: block;
+        margin-bottom: 6px;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      .input,
+      .select,
+      .textarea {
+        width: 100%;
+        min-height: 40px;
+        padding: 9px 11px;
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        color: var(--text);
+      }
+
+      .textarea {
+        min-height: 84px;
+        resize: vertical;
+      }
+
+      .login-shell {
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        background:
+          linear-gradient(180deg, rgba(47, 125, 92, 0.08), transparent 42%),
+          var(--bg);
+      }
+
+      .login-card {
+        width: min(440px, 100%);
+      }
+
+      .login-card .brand {
+        justify-content: center;
+        text-align: left;
+        margin-bottom: 24px;
+      }
+
+      .access-preview {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 11px 12px;
+        background: #fff7ed;
+        border: 1px solid #fed7aa;
+        border-radius: var(--radius);
+        color: #9a3412;
+        font-size: 13px;
+      }
+
+      .stepper-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 12px;
+        padding: 12px;
+        background: #fbfbf9;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+      }
+
+      .stepper {
+        display: grid;
+        grid-template-columns: 36px 46px 36px;
+        gap: 6px;
+        align-items: center;
+      }
+
+      .stepper button,
+      .icon-btn {
+        width: 36px;
+        height: 36px;
+        display: grid;
+        place-items: center;
+        border: 1px solid var(--line);
+        background: #fff;
+        border-radius: var(--radius);
+        font-weight: 900;
+      }
+
+      .stepper output {
+        height: 36px;
+        display: grid;
+        place-items: center;
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        font-weight: 900;
+      }
+
+      .timeline {
+        display: grid;
+        gap: 10px;
+      }
+
+      .timeline-item {
+        display: grid;
+        grid-template-columns: 90px minmax(0, 1fr);
+        gap: 12px;
+        padding: 12px;
+        background: #fbfbf9;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+      }
+
+      .split-row,
+      .list-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 11px 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .split-row:last-child,
+      .list-row:last-child {
+        border-bottom: 0;
+      }
+
+      .progress {
+        height: 10px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: #eef2f7;
+      }
+
+      .progress > span {
+        display: block;
+        height: 100%;
+        border-radius: inherit;
+        background: var(--primary);
+      }
+
+      .metric-strip {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .metric {
+        padding: 14px;
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+      }
+
+      .metric strong {
+        display: block;
+        margin-top: 4px;
+        font-size: 22px;
+      }
+
+      .empty {
+        display: grid;
+        place-items: center;
+        min-height: 170px;
+        padding: 24px;
+        color: var(--muted);
+        text-align: center;
+        border: 1px dashed #cfd7d3;
+        border-radius: var(--radius);
+        background: #fbfbf9;
+      }
+
+      .screen-note {
+        margin-bottom: 16px;
+        padding: 12px 14px;
+        border: 1px solid #dbeafe;
+        background: #eff6ff;
+        border-radius: var(--radius);
+        color: #1e40af;
+        font-size: 13px;
+      }
+
+      .login-only .app {
+        display: none;
+      }
+
+      body:not(.login-only) .login-shell {
+        display: none;
+      }
+
+      @media (max-width: 1080px) {
+        .grid.cols-4 {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 860px) {
+        .app {
+          grid-template-columns: 1fr;
+        }
+
+        .sidebar {
+          position: fixed;
+          inset: 0 auto 0 0;
+          z-index: 40;
+          width: min(320px, 88vw);
+          transform: translateX(-100%);
+          transition: transform 0.18s ease;
+          box-shadow: var(--shadow);
+        }
+
+        body.nav-open .sidebar {
+          transform: translateX(0);
+        }
+
+        .mobile-menu {
+          display: inline-grid;
+        }
+
+        .content,
+        .topbar {
+          padding-left: 16px;
+          padding-right: 16px;
+        }
+
+        .grid.cols-2,
+        .grid.cols-3,
+        .grid.cols-4,
+        .metric-strip {
+          grid-template-columns: 1fr;
+        }
+
+        .topbar {
+          align-items: flex-start;
+        }
+
+        .top-actions {
+          display: none;
+        }
+
+        .teams {
+          grid-template-columns: 1fr;
+        }
+
+        .team.away {
+          justify-content: flex-start;
+          text-align: left;
+        }
+
+        .scoreline {
+          width: 100%;
+        }
+
+        .timeline-item {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body class="login-only">
+    <section class="login-shell">
+      <div class="card card-pad login-card">
+        <div class="brand">
+          <div class="brand-mark">FL</div>
+          <div>
+            <h1>Fan League</h1>
+            <p>World Cup 2026 · Fan League</p>
+          </div>
+        </div>
+        <div class="form-grid">
+          <div class="field">
+            <label for="accessCode">Access code</label>
+            <input class="input" id="accessCode" value="HUY-7K29" />
+          </div>
+          <button class="btn primary" data-enter>Join League</button>
+          <div class="access-preview">
+            <span>Demo code maps to Huy · Acme VN</span>
+            <button class="btn ghost" data-goto="rules" data-enter>Rules</button>
+          </div>
+          <p class="muted small">
+            No email or password. Your nickname and company are resolved from
+            the access code.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <div class="app">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">FL</div>
+          <div>
+            <h1>Fan League</h1>
+            <p>FIFA World Cup 2026</p>
+          </div>
+        </div>
+        <div class="profile-pill">
+          <div class="avatar">H</div>
+          <div>
+            <strong>Huy</strong>
+            <span>Acme VN · Player/Admin</span>
+          </div>
+        </div>
+
+        <nav class="nav-section" aria-label="Player screens">
+          <p class="nav-title">Player</p>
+          <button class="nav-button active" data-goto="dashboard">
+            <span class="nav-left"><span>⌂</span><span>Dashboard</span></span>
+          </button>
+          <button class="nav-button" data-goto="matches">
+            <span class="nav-left"><span>◴</span><span>Matches</span></span>
+            <span class="badge live">2 live</span>
+          </button>
+          <button class="nav-button" data-goto="match-detail">
+            <span class="nav-left"><span>✎</span><span>Match Detail</span></span>
+          </button>
+          <button class="nav-button" data-goto="standings">
+            <span class="nav-left"><span>▦</span><span>Group Standings</span></span>
+          </button>
+          <button class="nav-button" data-goto="leaderboard">
+            <span class="nav-left"><span>♕</span><span>Leaderboard</span></span>
+          </button>
+          <button class="nav-button" data-goto="predictions">
+            <span class="nav-left"><span>✓</span><span>My Predictions</span></span>
+          </button>
+          <button class="nav-button" data-goto="results">
+            <span class="nav-left"><span>◎</span><span>Result Board</span></span>
+          </button>
+          <button class="nav-button" data-goto="prize">
+            <span class="nav-left"><span>₫</span><span>Prize Pool</span></span>
+          </button>
+          <button class="nav-button" data-goto="rules">
+            <span class="nav-left"><span>?</span><span>Rules</span></span>
+          </button>
+        </nav>
+
+        <nav class="nav-section" aria-label="Admin screens">
+          <p class="nav-title">Admin</p>
+          <button class="nav-button" data-goto="admin-dashboard">
+            <span class="nav-left"><span>▣</span><span>Admin Dashboard</span></span>
+          </button>
+          <button class="nav-button" data-goto="admin-players">
+            <span class="nav-left"><span>◌</span><span>Players</span></span>
+          </button>
+          <button class="nav-button" data-goto="admin-companies">
+            <span class="nav-left"><span>◇</span><span>Companies</span></span>
+          </button>
+          <button class="nav-button" data-goto="admin-money">
+            <span class="nav-left"><span>₫</span><span>Donations</span></span>
+          </button>
+          <button class="nav-button" data-goto="admin-matches">
+            <span class="nav-left"><span>◴</span><span>Matches</span></span>
+          </button>
+          <button class="nav-button" data-goto="admin-results">
+            <span class="nav-left"><span>◎</span><span>Results</span></span>
+          </button>
+          <button class="nav-button" data-goto="admin-settings">
+            <span class="nav-left"><span>⚙</span><span>Settings</span></span>
+          </button>
+          <button class="nav-button" data-goto="admin-exports">
+            <span class="nav-left"><span>⇩</span><span>Exports</span></span>
+          </button>
+          <button class="nav-button" data-goto="admin-audit">
+            <span class="nav-left"><span>≡</span><span>Audit Logs</span></span>
+          </button>
+        </nav>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <button class="icon-btn mobile-menu" data-toggle-menu>☰</button>
+          <div>
+            <h2 id="screenTitle">Dashboard</h2>
+            <p id="screenSubtitle">Quick overview for Huy · Acme VN</p>
+          </div>
+          <div class="top-actions">
+            <span class="badge open">Company scoped</span>
+            <span class="badge warning">Lock default: 5m</span>
+            <button class="btn ghost" data-logout>Logout</button>
+          </div>
+        </header>
+
+        <div class="content">
+          <section class="screen active" id="dashboard">
+            <div class="grid cols-4">
+              <article class="card card-pad kpi">
+                <span class="kpi-label">Your rank</span>
+                <span class="kpi-value">#2</span>
+                <span class="kpi-foot">21 pts · 5 exact scores</span>
+              </article>
+              <article class="card card-pad kpi">
+                <span class="kpi-label">Prize pool</span>
+                <span class="kpi-value">4.5M₫</span>
+                <span class="kpi-foot">20/20 players paid</span>
+              </article>
+              <article class="card card-pad kpi">
+                <span class="kpi-label">Predictions</span>
+                <span class="kpi-value">15/64</span>
+                <span class="kpi-foot">2 upcoming need picks</span>
+              </article>
+              <article class="card card-pad kpi">
+                <span class="kpi-label">Live matches</span>
+                <span class="kpi-value">2</span>
+                <span class="kpi-foot">Brazil leads Japan 1-0</span>
+              </article>
+            </div>
+
+            <div class="grid cols-2" style="margin-top: 16px">
+              <article class="card card-pad match-card">
+                <div class="section-head">
+                  <div>
+                    <h3>Live Now</h3>
+                    <p>Group A · 67'</p>
+                  </div>
+                  <span class="badge live">Live</span>
+                </div>
+                <div class="teams">
+                  <div class="team"><span class="flag">🇧🇷</span><span class="team-name">Brazil</span></div>
+                  <div class="scoreline"><span>1</span><span>-</span><span>0</span></div>
+                  <div class="team away"><span class="team-name">Japan</span><span class="flag">🇯🇵</span></div>
+                </div>
+                <div class="card-footer">
+                  <span class="muted">Your pick: Brazil 2 - 1 Japan</span>
+                  <button class="btn ghost" data-goto="match-detail">View predictions</button>
+                </div>
+              </article>
+
+              <article class="card card-pad match-card">
+                <div class="section-head">
+                  <div>
+                    <h3>Next Open Match</h3>
+                    <p>Kickoff 22:00 · closes in 2h 15m</p>
+                  </div>
+                  <span class="badge open">Open</span>
+                </div>
+                <div class="teams">
+                  <div class="team"><span class="flag">🇫🇷</span><span class="team-name">France</span></div>
+                  <div class="scoreline">vs</div>
+                  <div class="team away"><span class="team-name">Spain</span><span class="flag">🇪🇸</span></div>
+                </div>
+                <div class="card-footer">
+                  <span class="muted">No pick yet</span>
+                  <button class="btn primary" data-goto="match-detail">Predict</button>
+                </div>
+              </article>
+            </div>
+
+            <div class="grid cols-2" style="margin-top: 16px">
+              <article class="card card-pad">
+                <div class="section-head">
+                  <div>
+                    <h3>Top 3 Leaderboard</h3>
+                    <p>Office leaderboard · Acme VN</p>
+                  </div>
+                  <button class="btn ghost" data-goto="leaderboard">Full table</button>
+                </div>
+                <div class="list-row"><strong>🥇 Minh</strong><span>24 pts</span></div>
+                <div class="list-row"><strong>🥈 Huy</strong><span>21 pts</span></div>
+                <div class="list-row"><strong>🥉 An</strong><span>18 pts</span></div>
+              </article>
+
+              <article class="card card-pad">
+                <div class="section-head">
+                  <div>
+                    <h3>Recent Results</h3>
+                    <p>Your latest scored picks</p>
+                  </div>
+                </div>
+                <div class="timeline">
+                  <div class="timeline-item"><strong>+3 pts</strong><span>Germany 2 - 1 USA · exact score</span></div>
+                  <div class="timeline-item"><strong>+1 pt</strong><span>Argentina 1 - 0 Morocco · correct result</span></div>
+                  <div class="timeline-item"><strong>0 pts</strong><span>Portugal 1 - 1 Korea · wrong result</span></div>
+                </div>
+              </article>
+            </div>
+          </section>
+
+          <section class="screen" id="matches">
+            <div class="tabs">
+              <button class="tab active">Live (2)</button>
+              <button class="tab">Upcoming</button>
+              <button class="tab">Past</button>
+              <button class="tab">All</button>
+            </div>
+            <div class="grid cols-2">
+              <article class="card card-pad match-card">
+                <div class="match-meta"><span class="muted">Group A · Matchday 1</span><span class="badge live">Live 67'</span></div>
+                <div class="teams">
+                  <div class="team"><span class="flag">🇧🇷</span><span class="team-name">Brazil</span></div>
+                  <div class="scoreline"><span>1</span><span>-</span><span>0</span></div>
+                  <div class="team away"><span class="team-name">Japan</span><span class="flag">🇯🇵</span></div>
+                </div>
+                <div class="card-footer"><span>Your pick: 2 - 1</span><button class="btn ghost" data-goto="match-detail">View</button></div>
+              </article>
+              <article class="card card-pad match-card">
+                <div class="match-meta"><span class="muted">Group B · Matchday 1</span><span class="badge open">Open</span></div>
+                <div class="teams">
+                  <div class="team"><span class="flag">🇫🇷</span><span class="team-name">France</span></div>
+                  <div class="scoreline">vs</div>
+                  <div class="team away"><span class="team-name">Spain</span><span class="flag">🇪🇸</span></div>
+                </div>
+                <div class="card-footer"><span class="muted">No pick yet · closes 21:55</span><button class="btn primary" data-goto="match-detail">Predict</button></div>
+              </article>
+              <article class="card card-pad match-card">
+                <div class="match-meta"><span class="muted">Group C · Matchday 1</span><span class="badge locked">Locked</span></div>
+                <div class="teams">
+                  <div class="team"><span class="flag">🇩🇪</span><span class="team-name">Germany</span></div>
+                  <div class="scoreline">vs</div>
+                  <div class="team away"><span class="team-name">USA</span><span class="flag">🇺🇸</span></div>
+                </div>
+                <div class="card-footer"><span>Your pick: 2 - 1</span><button class="btn ghost">View predictions</button></div>
+              </article>
+              <article class="card card-pad match-card">
+                <div class="match-meta"><span class="muted">Group D · Matchday 1</span><span class="badge scored">Scored</span></div>
+                <div class="teams">
+                  <div class="team"><span class="flag">🇦🇷</span><span class="team-name">Argentina</span></div>
+                  <div class="scoreline"><span>1</span><span>-</span><span>0</span></div>
+                  <div class="team away"><span class="team-name">Morocco</span><span class="flag">🇲🇦</span></div>
+                </div>
+                <div class="card-footer"><span>Your pick: 2 - 0 → +1 pt</span><button class="btn ghost">Details</button></div>
+              </article>
+            </div>
+          </section>
+
+          <section class="screen" id="match-detail">
+            <div class="grid cols-2">
+              <article class="card card-pad match-card">
+                <div class="section-head">
+                  <div>
+                    <h3>Brazil vs Japan</h3>
+                    <p>Group A · MetLife Stadium · 22:00, 12/06/2026</p>
+                  </div>
+                  <span class="badge open">Open · closes in 01:24:37</span>
+                </div>
+                <div class="teams">
+                  <div class="team"><span class="flag">🇧🇷</span><span class="team-name">Brazil</span></div>
+                  <div class="scoreline">vs</div>
+                  <div class="team away"><span class="team-name">Japan</span><span class="flag">🇯🇵</span></div>
+                </div>
+              </article>
+
+              <article class="card card-pad">
+                <div class="section-head">
+                  <div>
+                    <h3>Your Prediction</h3>
+                    <p>Editable until lock time. Score range: 0-20.</p>
+                  </div>
+                </div>
+                <div class="form-grid">
+                  <div class="stepper-row">
+                    <strong>Brazil</strong>
+                    <div class="stepper" data-score>
+                      <button data-minus>-</button><output>2</output><button data-plus>+</button>
+                    </div>
+                  </div>
+                  <div class="stepper-row">
+                    <strong>Japan</strong>
+                    <div class="stepper" data-score>
+                      <button data-minus>-</button><output>1</output><button data-plus>+</button>
+                    </div>
+                  </div>
+                  <button class="btn primary">Save Prediction</button>
+                </div>
+              </article>
+            </div>
+
+            <div class="grid cols-2" style="margin-top: 16px">
+              <article class="card card-pad">
+                <div class="section-head">
+                  <div>
+                    <h3>Predictions Before Lock</h3>
+                    <p>Scores are hidden until match is locked.</p>
+                  </div>
+                </div>
+                <div class="list-row"><strong>Huy</strong><span class="badge open">Submitted</span></div>
+                <div class="list-row"><strong>Minh</strong><span class="badge open">Submitted</span></div>
+                <div class="list-row"><strong>An</strong><span class="badge">Not submitted</span></div>
+                <div class="list-row"><strong>Linh</strong><span class="badge open">Submitted</span></div>
+              </article>
+
+              <article class="card card-pad">
+                <div class="section-head">
+                  <div>
+                    <h3>After Lock / Scored State</h3>
+                    <p>Prototype shows final visibility rules.</p>
+                  </div>
+                </div>
+                <div class="table-wrap">
+                  <table>
+                    <thead><tr><th>Player</th><th>Pick</th><th>Status</th><th>Points</th></tr></thead>
+                    <tbody>
+                      <tr class="me"><td>Huy</td><td>2 - 1</td><td>Exact score</td><td>+3</td></tr>
+                      <tr><td>Minh</td><td>1 - 0</td><td>Correct result</td><td>+1</td></tr>
+                      <tr><td>An</td><td>1 - 1</td><td>Wrong</td><td>0</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </article>
+            </div>
+          </section>
+
+          <section class="screen" id="standings">
+            <div class="screen-note">WC 2026 group standings are World Cup data, shared across companies. Office leaderboard remains company-scoped.</div>
+            <div class="tabs">
+              <button class="tab active">Group A</button><button class="tab">B</button><button class="tab">C</button><button class="tab">D</button><button class="tab">E</button><button class="tab">F</button><button class="tab">G</button><button class="tab">H</button><button class="tab">I</button><button class="tab">J</button><button class="tab">K</button><button class="tab">L</button>
+            </div>
+            <article class="card card-pad">
+              <div class="section-head"><div><h3>Group A</h3><p>Top 2 qualify, best 3rd-place teams may advance.</p></div><span class="badge live">Brazil live</span></div>
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>#</th><th>Team</th><th>MP</th><th>W</th><th>D</th><th>L</th><th>GF</th><th>GA</th><th>GD</th><th>Pts</th></tr></thead>
+                  <tbody>
+                    <tr class="qualify"><td>1</td><td>🇧🇷 Brazil</td><td>3</td><td>3</td><td>0</td><td>0</td><td>7</td><td>2</td><td>+5</td><td><strong>9</strong></td></tr>
+                    <tr class="qualify"><td>2</td><td>🇯🇵 Japan</td><td>3</td><td>1</td><td>1</td><td>1</td><td>4</td><td>4</td><td>0</td><td><strong>4</strong></td></tr>
+                    <tr><td>3</td><td>🇲🇽 Mexico</td><td>3</td><td>1</td><td>0</td><td>2</td><td>3</td><td>5</td><td>-2</td><td><strong>3</strong></td></tr>
+                    <tr><td>4</td><td>🇸🇳 Senegal</td><td>3</td><td>0</td><td>1</td><td>2</td><td>1</td><td>4</td><td>-3</td><td><strong>1</strong></td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </article>
+          </section>
+
+          <section class="screen" id="leaderboard">
+            <article class="card card-pad">
+              <div class="section-head">
+                <div><h3>Office Leaderboard · Acme VN</h3><p>15 scored matches of 64 total. Tie-break: points, exact, correct, predicted.</p></div>
+                <span class="badge open">Company scoped</span>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>Rank</th><th>Nickname</th><th>Pts</th><th>Exact</th><th>Correct</th><th>Wrong</th><th>Played</th></tr></thead>
+                  <tbody>
+                    <tr><td><span class="bubble">1</span></td><td>🥇 Minh</td><td><strong>24</strong></td><td>6</td><td>6</td><td>3</td><td>15</td></tr>
+                    <tr class="me"><td><span class="bubble">2</span></td><td>🥈 Huy</td><td><strong>21</strong></td><td>5</td><td>6</td><td>4</td><td>15</td></tr>
+                    <tr><td><span class="bubble">3</span></td><td>🥉 An</td><td><strong>18</strong></td><td>4</td><td>6</td><td>5</td><td>15</td></tr>
+                    <tr><td>4</td><td>Linh</td><td>17</td><td>3</td><td>8</td><td>4</td><td>15</td></tr>
+                    <tr><td>5</td><td>Trang</td><td>16</td><td>3</td><td>7</td><td>5</td><td>15</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </article>
+          </section>
+
+          <section class="screen" id="predictions">
+            <div class="grid cols-3">
+              <article class="card card-pad kpi"><span class="kpi-label">Submitted</span><span class="kpi-value">15</span><span class="kpi-foot">64 total matches</span></article>
+              <article class="card card-pad kpi"><span class="kpi-label">Exact score</span><span class="kpi-value">5</span><span class="kpi-foot">15 scored matches</span></article>
+              <article class="card card-pad kpi"><span class="kpi-label">Need action</span><span class="kpi-value">2</span><span class="kpi-foot">Open matches without pick</span></article>
+            </div>
+            <article class="card card-pad" style="margin-top: 16px">
+              <div class="section-head"><div><h3>Prediction Tracking</h3><p>Review submission status before lock and scores after lock.</p></div></div>
+              <div class="tabs">
+                <button class="tab active">By match</button>
+                <button class="tab">By participant</button>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>Match</th><th>Player</th><th>Visibility</th><th>Prediction</th><th>Status</th><th>Points</th></tr></thead>
+                  <tbody>
+                    <tr class="me"><td>Brazil vs Japan</td><td>Huy</td><td><span class="badge open">Before lock</span></td><td>Submitted</td><td>Hidden</td><td>—</td></tr>
+                    <tr><td>Brazil vs Japan</td><td>Minh</td><td><span class="badge open">Before lock</span></td><td>Submitted</td><td>Hidden</td><td>—</td></tr>
+                    <tr><td>Brazil vs Japan</td><td>An</td><td><span class="badge open">Before lock</span></td><td>Not submitted</td><td>Visible</td><td>—</td></tr>
+                    <tr><td>Germany vs USA</td><td>Huy</td><td><span class="badge locked">After lock</span></td><td>2 - 1</td><td>Exact score</td><td>+3</td></tr>
+                    <tr><td>Germany vs USA</td><td>Minh</td><td><span class="badge locked">After lock</span></td><td>1 - 0</td><td>Correct result</td><td>+1</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </article>
+          </section>
+
+          <section class="screen" id="results">
+            <article class="card card-pad">
+              <div class="section-head"><div><h3>Result Board</h3><p>Final scores, winners and scoring state.</p></div></div>
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>Match</th><th>Final score</th><th>Status</th><th>Exact winners</th><th>Correct result</th><th>Scored at</th></tr></thead>
+                  <tbody>
+                    <tr><td>Germany vs USA</td><td>2 - 1</td><td><span class="badge scored">Scored</span></td><td>Huy, Minh</td><td>8 players</td><td>11/06 · 22:01</td></tr>
+                    <tr><td>Argentina vs Morocco</td><td>1 - 0</td><td><span class="badge scored">Scored</span></td><td>An</td><td>10 players</td><td>10/06 · 01:15</td></tr>
+                    <tr><td>Portugal vs Korea</td><td>1 - 1</td><td><span class="badge scored">Scored</span></td><td>None</td><td>4 players</td><td>09/06 · 23:40</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </article>
+          </section>
+
+          <section class="screen" id="prize">
+            <div class="grid cols-2">
+              <article class="card card-pad">
+                <div class="section-head"><div><h3>Total Prize Pool</h3><p>Acme VN company pool only.</p></div><span class="badge open">20/20 paid</span></div>
+                <div class="kpi"><span class="kpi-value">4,500,000₫</span><span class="kpi-foot">4,000,000₫ player contributions + 500,000₫ sponsors</span></div>
+                <div style="margin-top: 16px">
+                  <div class="split-row"><strong>🥇 1st place</strong><span>60% · 2,700,000₫</span></div>
+                  <div class="split-row"><strong>🥈 2nd place</strong><span>30% · 1,350,000₫</span></div>
+                  <div class="split-row"><strong>🥉 3rd place</strong><span>10% · 450,000₫</span></div>
+                </div>
+              </article>
+              <article class="card card-pad">
+                <div class="section-head"><div><h3>Sponsors</h3><p>Cash and reward contributions.</p></div></div>
+                <div class="list-row"><strong>Team DevOps</strong><span>500,000₫</span></div>
+                <div class="list-row"><strong>Design Guild</strong><span>Exact score badge prize</span></div>
+                <div class="list-row"><strong>Office Admin</strong><span>Snack box for champion</span></div>
+              </article>
+            </div>
+            <article class="card card-pad" style="margin-top: 16px">
+              <div class="section-head"><div><h3>Contributions</h3><p>Public transparency list.</p></div></div>
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>Player</th><th>Amount</th><th>Status</th><th>Paid at</th></tr></thead>
+                  <tbody>
+                    <tr><td>Huy</td><td>200,000₫</td><td><span class="badge scored">Paid</span></td><td>01/06</td></tr>
+                    <tr><td>Minh</td><td>200,000₫</td><td><span class="badge scored">Paid</span></td><td>01/06</td></tr>
+                    <tr><td>An</td><td>200,000₫</td><td><span class="badge scored">Paid</span></td><td>02/06</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </article>
+          </section>
+
+          <section class="screen" id="rules">
+            <div class="grid cols-2">
+              <article class="card card-pad">
+                <div class="section-head"><div><h3>Rules</h3><p>Short version for players.</p></div></div>
+                <div class="list-row"><strong>Prediction</strong><span>One score pick per match</span></div>
+                <div class="list-row"><strong>Lock time</strong><span>Kickoff minus 5 minutes</span></div>
+                <div class="list-row"><strong>Exact score</strong><span>3 points</span></div>
+                <div class="list-row"><strong>Correct result</strong><span>1 point</span></div>
+                <div class="list-row"><strong>Wrong result</strong><span>0 points</span></div>
+              </article>
+              <article class="card card-pad">
+                <div class="section-head"><div><h3>Fair Play</h3><p>Friendly office game, not betting.</p></div></div>
+                <p class="muted">No odds, no wager per match, no stake between players. Contributions are fixed before the tournament and only form the prize pool.</p>
+                <p class="muted">Backend rejects prediction writes after lock time and hides other scores before lock.</p>
+              </article>
+            </div>
+          </section>
+
+          <section class="screen" id="admin-dashboard">
+            <div class="metric-strip">
+              <div class="metric"><span class="muted">Players</span><strong>20</strong></div>
+              <div class="metric"><span class="muted">Paid</span><strong>20</strong></div>
+              <div class="metric"><span class="muted">Need result</span><strong>1</strong></div>
+              <div class="metric"><span class="muted">Audit events</span><strong>128</strong></div>
+            </div>
+            <div class="grid cols-2" style="margin-top: 16px">
+              <article class="card card-pad">
+                <div class="section-head"><div><h3>Admin Checklist</h3><p>Company: Acme VN</p></div></div>
+                <div class="list-row"><span>Create company settings</span><span class="badge scored">Done</span></div>
+                <div class="list-row"><span>Generate player access codes</span><span class="badge scored">Done</span></div>
+                <div class="list-row"><span>Import fixtures</span><span class="badge scored">Done</span></div>
+                <div class="list-row"><span>Review lock times</span><span class="badge warning">Needs review</span></div>
+              </article>
+              <article class="card card-pad">
+                <div class="section-head"><div><h3>Matches Needing Result</h3><p>Manual fallback remains available.</p></div></div>
+                <div class="list-row"><strong>Germany vs USA</strong><button class="btn primary" data-goto="admin-results">Enter result</button></div>
+                <div class="list-row"><strong>Portugal vs Korea</strong><span class="badge scored">Scored</span></div>
+              </article>
+            </div>
+          </section>
+
+          <section class="screen" id="admin-players">
+            <div class="grid cols-2">
+              <article class="card card-pad">
+                <div class="section-head"><div><h3>Add Player</h3><p>Nickname-only identity.</p></div></div>
+                <div class="form-grid">
+                  <div class="field"><label>Nickname</label><input class="input" value="Khoa" /></div>
+                  <div class="field"><label>Role</label><select class="select"><option>PLAYER</option><option>ADMIN</option></select></div>
+                  <div class="field"><label>Company</label><input class="input" value="Acme VN" disabled /></div>
+                  <button class="btn primary">Generate access code</button>
+                </div>
+              </article>
+              <article class="card card-pad">
+                <div class="section-head"><div><h3>Players</h3><p>Access code is shown once on create/reset.</p></div></div>
+                <div class="table-wrap">
+                  <table>
+                    <thead><tr><th>Nickname</th><th>Role</th><th>Status</th><th>Paid</th><th>Actions</th></tr></thead>
+                    <tbody>
+                      <tr><td>Huy</td><td>ADMIN</td><td>Active</td><td>Paid</td><td><button class="btn ghost">Reset code</button></td></tr>
+                      <tr><td>Minh</td><td>PLAYER</td><td>Active</td><td>Paid</td><td><button class="btn ghost">Disable</button></td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </article>
+            </div>
+          </section>
+
+          <section class="screen" id="admin-companies">
+            <article class="card card-pad">
+              <div class="section-head"><div><h3>Companies</h3><p>Usually setup-only; normal admins stay within their company.</p></div><button class="btn primary">New company</button></div>
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>Name</th><th>Slug</th><th>Status</th><th>Players</th><th>Actions</th></tr></thead>
+                  <tbody>
+                    <tr><td>Acme VN</td><td>acme-vn</td><td><span class="badge scored">Active</span></td><td>20</td><td><button class="btn ghost">Edit</button></td></tr>
+                    <tr><td>Beta Studio</td><td>beta-studio</td><td><span class="badge scored">Active</span></td><td>12</td><td><button class="btn ghost">Edit</button></td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </article>
+          </section>
+
+          <section class="screen" id="admin-money">
+            <div class="grid cols-2">
+              <article class="card card-pad">
+                <div class="section-head"><div><h3>Contribution Tracking</h3><p>Company-scoped payment status.</p></div></div>
+                <div class="progress"><span style="width: 100%"></span></div>
+                <p class="muted small">20 of 20 players paid · 4,000,000₫</p>
+                <div class="table-wrap">
+                  <table>
+                    <thead><tr><th>Player</th><th>Amount</th><th>Status</th><th>Action</th></tr></thead>
+                    <tbody>
+                      <tr><td>Huy</td><td>200,000₫</td><td>Paid</td><td><button class="btn ghost">Edit</button></td></tr>
+                      <tr><td>Khoa</td><td>200,000₫</td><td>Pending</td><td><button class="btn primary">Mark paid</button></td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </article>
+              <article class="card card-pad">
+                <div class="section-head"><div><h3>Sponsor Entry</h3><p>Cash or reward description.</p></div></div>
+                <div class="form-grid">
+                  <div class="field"><label>Sponsor name</label><input class="input" value="Team DevOps" /></div>
+                  <div class="field"><label>Amount</label><input class="input" value="500000" /></div>
+                  <div class="field"><label>Reward description</label><textarea class="textarea">Bonus for exact score champion</textarea></div>
+                  <button class="btn primary">Save sponsor</button>
+                </div>
+              </article>
+            </div>
+            <article class="card card-pad" style="margin-top: 16px">
+              <div class="section-head"><div><h3>Prize Pool Impact</h3><p>Contributions and sponsors update public prize pool.</p></div></div>
+              <div class="grid cols-2">
+                <div>
+                  <div class="list-row"><strong>Player contributions</strong><span>4,000,000₫</span></div>
+                  <div class="list-row"><strong>Paid players</strong><span>20 / 20</span></div>
+                  <div class="list-row"><strong>Pending amount</strong><span>0₫</span></div>
+                </div>
+                <div>
+                  <div class="list-row"><strong>Team DevOps</strong><span>500,000₫</span></div>
+                  <div class="list-row"><strong>Design Guild</strong><span>Badge prize</span></div>
+                </div>
+              </div>
+            </article>
+          </section>
+
+          <section class="screen" id="admin-exports">
+              <article class="card card-pad">
+                <div class="section-head"><div><h3>Exports</h3><p>Download league data for review and settlement.</p></div></div>
+                <div class="table-wrap">
+                  <table>
+                    <thead><tr><th>Data type</th><th>Scope</th><th>Format</th><th>Action</th></tr></thead>
+                    <tbody>
+                      <tr><td>Match results</td><td>Opened league matches</td><td>CSV</td><td><button class="btn primary">Export</button></td></tr>
+                      <tr><td>Prediction results</td><td>Acme VN</td><td>CSV</td><td><button class="btn primary">Export</button></td></tr>
+                      <tr><td>Leaderboard</td><td>Current ranking</td><td>CSV</td><td><button class="btn primary">Export</button></td></tr>
+                      <tr><td>Prediction history</td><td>All players</td><td>CSV</td><td><button class="btn primary">Export</button></td></tr>
+                      <tr><td>Donations</td><td>Contributions + sponsors</td><td>CSV</td><td><button class="btn primary">Export</button></td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </article>
+          </section>
+
+          <section class="screen" id="admin-matches">
+            <div class="grid cols-2">
+              <article class="card card-pad">
+                <div class="section-head"><div><h3>Import Fixtures</h3><p>CSV/API sync creates fixtures, not open predictions.</p></div></div>
+                <div class="form-grid">
+                  <div class="field"><label>CSV file</label><input class="input" value="worldcup-2026-fixtures.csv" /></div>
+                  <button class="btn primary">Preview import</button>
+                  <button class="btn ghost">Sync from API provider</button>
+                </div>
+              </article>
+              <article class="card card-pad">
+                <div class="section-head"><div><h3>Open Prediction</h3><p>Select which fixture is fun enough for Acme VN.</p></div></div>
+                <div class="form-grid">
+                  <div class="field"><label>Match</label><select class="select"><option>France vs Spain</option></select></div>
+                  <div class="field"><label>Kickoff</label><input class="input" value="2026-06-12 22:00 +07" /></div>
+                  <div class="field"><label>Lock time</label><input class="input" value="2026-06-12 21:55 +07" /></div>
+                  <button class="btn primary">Open prediction</button>
+                </div>
+              </article>
+            </div>
+          </section>
+
+          <section class="screen" id="admin-results">
+            <article class="card card-pad">
+              <div class="section-head"><div><h3>Enter Result</h3><p>Manual result entry triggers scoring and audit log.</p></div><span class="badge warning">Needs result</span></div>
+              <div class="grid cols-3">
+                <div class="field"><label>Match</label><select class="select"><option>Germany vs USA</option></select></div>
+                <div class="field"><label>Home score</label><input class="input" value="2" /></div>
+                <div class="field"><label>Away score</label><input class="input" value="1" /></div>
+              </div>
+              <div class="card-footer">
+                <span class="muted">Source: Manual · FIFA official website</span>
+                <div><button class="btn primary">Save and score</button> <button class="btn danger">Void match</button></div>
+              </div>
+            </article>
+          </section>
+
+          <section class="screen" id="admin-settings">
+            <article class="card card-pad">
+              <div class="section-head"><div><h3>Company Settings</h3><p>Stored per company.</p></div></div>
+              <div class="grid cols-2">
+                <div class="field"><label>App name</label><input class="input" value="Fan League" /></div>
+                <div class="field"><label>Company name</label><input class="input" value="Acme VN" /></div>
+                <div class="field"><label>Default lock minutes</label><input class="input" value="5" /></div>
+                <div class="field"><label>Contribution amount</label><input class="input" value="200000" /></div>
+                <div class="field"><label>Prediction visibility</label><select class="select"><option>AFTER_LOCK</option></select></div>
+                <div class="field"><label>Football API provider</label><select class="select"><option>manual</option><option>sportmonks</option><option>football-data.org</option></select></div>
+              </div>
+              <div class="card-footer"><span class="muted">Prize split: 60 / 30 / 10</span><button class="btn primary">Save settings</button></div>
+            </article>
+          </section>
+
+          <section class="screen" id="admin-audit">
+            <article class="card card-pad">
+              <div class="section-head"><div><h3>Audit Logs</h3><p>Admin actions with company scope.</p></div></div>
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>Time</th><th>Actor</th><th>Entity</th><th>Action</th><th>Summary</th></tr></thead>
+                  <tbody>
+                    <tr><td>19:12</td><td>Huy</td><td>MATCH</td><td>UPDATE_RESULT</td><td>Germany vs USA result set to 2-1</td></tr>
+                    <tr><td>18:40</td><td>Huy</td><td>PARTICIPANT</td><td>RESET_CODE</td><td>Reset access code for Minh</td></tr>
+                    <tr><td>18:12</td><td>Huy</td><td>SETTING</td><td>UPDATE</td><td>Default lock minutes changed to 5</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </article>
+          </section>
+        </div>
+      </main>
+    </div>
+
+    <script>
+      const titles = {
+        dashboard: ["Dashboard", "Quick overview for Huy · Acme VN"],
+        matches: ["Matches", "Live, upcoming and scored fixtures"],
+        "match-detail": ["Match Detail", "Predict, lock visibility and scoring states"],
+        standings: ["Standings & Bracket", "World Cup groups and knockout bracket"],
+        leaderboard: ["Leaderboard", "Office ranking for Acme VN"],
+        predictions: ["My Predictions", "Prediction history and personal stats"],
+        results: ["Result Board", "Final scores and scoring output"],
+        prize: ["Prize Pool", "Contributions, sponsors and split"],
+        rules: ["Rules", "Short rules and fair-play policy"],
+        "admin-dashboard": ["Admin Dashboard", "Company operations overview"],
+        "admin-players": ["Admin Players", "Nickname-only player management"],
+        "admin-companies": ["Admin Companies", "Setup and company status"],
+        "admin-money": ["Admin Donations", "Contributions, sponsors and prize impact"],
+        "admin-matches": ["Admin Matches", "Import, edit and sync fixtures"],
+        "admin-results": ["Admin Results", "Manual result entry and scoring"],
+        "admin-settings": ["Admin Settings", "Company-level app settings"],
+        "admin-exports": ["Admin Exports", "Download results, predictions and leaderboard"],
+        "admin-audit": ["Audit Logs", "Admin changes and fairness trail"],
+      };
+
+      function showScreen(id) {
+        const target = document.getElementById(id);
+        if (!target) return;
+        document.body.classList.remove("login-only", "nav-open");
+        document.querySelectorAll(".screen").forEach((screen) => {
+          screen.classList.toggle("active", screen.id === id);
+        });
+        document.querySelectorAll(".nav-button").forEach((button) => {
+          button.classList.toggle("active", button.dataset.goto === id);
+        });
+        const [title, subtitle] = titles[id] || titles.dashboard;
+        document.getElementById("screenTitle").textContent = title;
+        document.getElementById("screenSubtitle").textContent = subtitle;
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+
+      document.addEventListener("click", (event) => {
+        const enterButton = event.target.closest("[data-enter]");
+        if (enterButton) {
+          showScreen(enterButton.dataset.goto || "dashboard");
+          return;
+        }
+
+        const gotoButton = event.target.closest("[data-goto]");
+        if (gotoButton) {
+          showScreen(gotoButton.dataset.goto);
+          return;
+        }
+
+        if (event.target.closest("[data-toggle-menu]")) {
+          document.body.classList.toggle("nav-open");
+          return;
+        }
+
+        if (event.target.closest("[data-logout]")) {
+          document.body.classList.add("login-only");
+          return;
+        }
+
+        const minus = event.target.closest("[data-minus]");
+        const plus = event.target.closest("[data-plus]");
+        if (minus || plus) {
+          const output = event.target.closest("[data-score]").querySelector("output");
+          const current = Number(output.textContent);
+          const next = Math.max(0, Math.min(20, current + (plus ? 1 : -1)));
+          output.textContent = next;
+        }
+      });
+    </script>
+  </body>
+</html>
