@@ -1,0 +1,171 @@
+name: Deploy to VM
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "frontend/**"
+      - "prisma/schema.prisma"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: vm-deploy
+  cancel-in-progress: false
+
+env:
+  BACKEND_IMAGE: docker.io/${{ vars.DOCKERHUB_USERNAME }}/wcleague-be
+  FRONTEND_IMAGE: docker.io/${{ vars.DOCKERHUB_USERNAME }}/wcleague-fe
+
+jobs:
+  build-push:
+    name: Build & push images
+    runs-on: ubuntu-latest
+    environment: prod
+    outputs:
+      short_sha: ${{ steps.tag.outputs.short_sha }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Set short SHA
+        id: tag
+        run: echo "short_sha=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - name: Build & push backend
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: backend/Dockerfile
+          push: true
+          tags: |
+            ${{ env.BACKEND_IMAGE }}:${{ steps.tag.outputs.short_sha }}
+            ${{ env.BACKEND_IMAGE }}:latest
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
+
+      - name: Build & push frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: frontend/Dockerfile
+          push: true
+          build-args: |
+            NEXT_PUBLIC_API_BASE_URL=
+          tags: |
+            ${{ env.FRONTEND_IMAGE }}:${{ steps.tag.outputs.short_sha }}
+            ${{ env.FRONTEND_IMAGE }}:latest
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,mode=max,scope=frontend
+
+  deploy:
+    name: Deploy to VM
+    runs-on: ubuntu-latest
+    needs: build-push
+    environment: prod
+
+    steps:
+      - name: Checkout (for compose file)
+        uses: actions/checkout@v4
+
+      - name: Pin image tags in compose file
+        env:
+          SHA: ${{ needs.build-push.outputs.short_sha }}
+          DUSER: ${{ vars.DOCKERHUB_USERNAME }}
+        run: |
+          sed -i "s|image: docker.io/.*/wcleague-be:.*|image: docker.io/${DUSER}/wcleague-be:${SHA}|" docker-compose.yml
+          sed -i "s|image: docker.io/.*/wcleague-fe:.*|image: docker.io/${DUSER}/wcleague-fe:${SHA}|" docker-compose.yml
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          script: |
+            set -euo pipefail
+            cd /home/${{ secrets.VM_USER }}/wc-league
+
+            echo "==> Pulling new images..."
+            docker compose -f docker-compose.yml pull backend frontend
+
+            echo "==> Starting services..."
+            docker compose -f docker-compose.yml up -d
+
+            echo "==> Pruning old images..."
+            docker image prune -f
+
+      - name: Verify containers on VM
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          script: |
+            set -euo pipefail
+            cd /home/${{ secrets.VM_USER }}/wc-league
+
+            SERVICES="backend frontend"
+            MAX_WAIT=60
+            ELAPSED=0
+            ALL_OK=true
+
+            echo "==> Waiting up to ${MAX_WAIT}s for containers to be running..."
+            while [ "$ELAPSED" -lt "$MAX_WAIT" ]; do
+              ALL_OK=true
+              for svc in $SERVICES; do
+                STATUS=$(docker compose inspect --format='{{.State.Status}}' "$svc" 2>/dev/null || echo "missing")
+                if [ "$STATUS" != "running" ]; then
+                  echo "  $svc: $STATUS"
+                  ALL_OK=false
+                fi
+              done
+              if $ALL_OK; then
+                echo "All containers running."
+                break
+              fi
+              sleep 5
+              ELAPSED=$((ELAPSED + 5))
+            done
+
+            if ! $ALL_OK; then
+              echo "ERROR: containers not healthy after ${MAX_WAIT}s"
+              docker compose -f docker-compose.yml ps
+              docker compose -f docker-compose.yml logs --tail=50
+              exit 1
+            fi
+
+            docker compose -f docker-compose.yml ps
+
+      - name: Smoke test — health endpoint
+        run: |
+          echo "==> Probing https://${{ secrets.VM_DOMAIN }}/health ..."
+          for i in 1 2 3 4 5; do
+            HTTP_STATUS=$(curl -o /dev/null -sw "%{http_code}" \
+              --max-time 10 --retry 0 \
+              "https://${{ secrets.VM_DOMAIN }}/health" || echo "000")
+            if [ "$HTTP_STATUS" = "200" ]; then
+              BODY=$(curl -sf --max-time 10 "https://${{ secrets.VM_DOMAIN }}/health")
+              echo "Response: $BODY"
+              OK=$(echo "$BODY" | jq -r '.ok' 2>/dev/null || echo "")
+              if [ "$OK" = "true" ]; then
+                echo "Smoke test passed (attempt $i)."
+                exit 0
+              fi
+            fi
+            echo "Attempt $i: HTTP $HTTP_STATUS — retrying in 10s..."
+            sleep 10
+          done
+          echo "ERROR: /health did not return ok after 5 attempts."
+          exit 1

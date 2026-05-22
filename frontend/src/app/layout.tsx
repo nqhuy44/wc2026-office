@@ -8,7 +8,8 @@ const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
 export const metadata: Metadata = {
   title: "League Portal",
-  description: "League Portal"
+  description: "Internal tool",
+  robots: { index: false, follow: false },
 };
 
 export default function RootLayout({
