@@ -6,7 +6,8 @@ RUN npm install
 FROM node:26-alpine AS builder
 WORKDIR /app/backend
 COPY --from=deps /app/backend/node_modules ./node_modules
-COPY backend/src ./
+COPY backend/package.json backend/tsconfig.json ./
+COPY backend/src ./src
 COPY prisma /app/prisma
 RUN npm run prisma:generate && npm run build
 
