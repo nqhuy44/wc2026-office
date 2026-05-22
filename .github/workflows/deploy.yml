@@ -6,7 +6,7 @@ on:
     paths:
       - "backend/**"
       - "frontend/**"
-      - "prisma/schema.prisma"
+      - "prisma/**"
       - ".github/workflows/deploy.yml"
   workflow_dispatch:
 

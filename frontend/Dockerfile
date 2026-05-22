@@ -1,17 +1,19 @@
-FROM node:22-alpine AS deps
+FROM node:26-alpine AS deps
 WORKDIR /app/frontend
-COPY frontend/package.json frontend/package-lock.json ./
-RUN npm ci
+COPY frontend/package.json ./
+RUN npm install
 
-FROM node:22-alpine AS builder
+FROM node:26-alpine AS builder
 ARG NEXT_PUBLIC_API_BASE_URL=
 ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
 WORKDIR /app/frontend
 COPY --from=deps /app/frontend/node_modules ./node_modules
-COPY frontend ./
+COPY frontend/next.config.ts frontend/tsconfig.json frontend/postcss.config.mjs frontend/tailwind.config.ts frontend/components.json ./
+COPY frontend/src ./src
+COPY frontend/public ./public
 RUN npm run build
 
-FROM node:22-alpine AS runner
+FROM node:26-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
