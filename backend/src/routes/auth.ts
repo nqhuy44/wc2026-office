@@ -35,7 +35,7 @@ export async function authRoutes(app: FastifyInstance) {
     });
 
     if (!user) {
-      return reply.status(401).send({ error: "Unauthorized", message: "Username hoặc passcode không hợp lệ" });
+      return reply.status(401).send({ error: "Unauthorized", code: "errInvalidCredentials" });
     }
 
     const sessionToken = generateSessionToken();
@@ -98,7 +98,7 @@ export async function authRoutes(app: FastifyInstance) {
     });
 
     if (existingUser) {
-      return reply.status(409).send({ error: "Conflict", message: "Username này đã được sử dụng" });
+      return reply.status(409).send({ error: "Conflict", code: "errUsernameTaken" });
     }
 
     const passcodeHash = hashString(passcode.trim());
@@ -145,6 +145,37 @@ export async function authRoutes(app: FastifyInstance) {
         memberships: []
       }
     };
+  });
+
+  app.post("/auth/me/change-passcode", { preHandler: [app.requireAuth] }, async (request, reply) => {
+    const { currentPasscode, newPasscode } = z.object({
+      currentPasscode: z.string().min(1),
+      newPasscode: z.string().min(3).max(50),
+    }).parse(request.body);
+
+    const user = await prisma.user.findUnique({ where: { id: request.user!.id } });
+    if (!user) return reply.status(404).send({ error: "Not Found" });
+
+    if (user.passcodeHash !== hashString(currentPasscode.trim())) {
+      return reply.status(401).send({ error: "Unauthorized", code: "wrongCurrentPasscode" });
+    }
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { passcodeHash: hashString(newPasscode.trim()) }
+    });
+
+    // Invalidate all other sessions, keep the current one active
+    const sessionToken = request.cookies.session;
+    const currentTokenHash = sessionToken ? hashString(sessionToken) : null;
+    await prisma.session.deleteMany({
+      where: {
+        userId: user.id,
+        ...(currentTokenHash ? { tokenHash: { not: currentTokenHash } } : {})
+      }
+    });
+
+    return { ok: true, message: "Đã đổi passcode thành công" };
   });
 
   app.post("/auth/logout", async (request, reply) => {

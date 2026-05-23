@@ -4,6 +4,16 @@ interface RequestOptions extends RequestInit {
   json?: any;
 }
 
+export class ApiError extends Error {
+  code: string;
+  status: number;
+  constructor(code: string, message: string, status: number) {
+    super(message);
+    this.code = code;
+    this.status = status;
+  }
+}
+
 export async function apiClient<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const apiPath = path.startsWith("/api") ? path : `/api${path}`;
   const url = `${API_BASE_URL}${apiPath}`;
@@ -14,7 +24,6 @@ export async function apiClient<T>(path: string, options: RequestOptions = {}): 
     options.body = JSON.stringify(options.json);
   }
 
-  // Inject active league ID from localStorage if client side
   if (typeof window !== "undefined") {
     const activeLeagueId = localStorage.getItem("activeLeagueId");
     if (activeLeagueId) {
@@ -22,23 +31,21 @@ export async function apiClient<T>(path: string, options: RequestOptions = {}): 
     }
   }
 
-  // Ensure cookies are sent (CORS)
   options.credentials = "include";
 
-  const response = await fetch(url, {
-    ...options,
-    headers,
-  });
+  const response = await fetch(url, { ...options, headers });
 
   if (!response.ok) {
-    let errorMsg = "Something went wrong";
+    let code = "errUnknown";
+    let message = "Something went wrong";
     try {
       const errData = await response.json();
-      errorMsg = errData.message || errorMsg;
+      code = errData.code || code;
+      message = errData.message || message;
     } catch {
       // ignore
     }
-    throw new Error(errorMsg);
+    throw new ApiError(code, message, response.status);
   }
 
   return response.json() as Promise<T>;

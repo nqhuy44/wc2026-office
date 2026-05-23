@@ -153,7 +153,7 @@ function SuperAdminContent() {
       setNewLeagueSlug("");
       alert(t("leagueSuccessCreated"));
     } catch (err: any) {
-      alert(err.message || t("failedToCreateLeague"));
+      alert(err.code ? t(err.code as any) : t("errUnknown"));
     } finally {
       setCreatingLeague(false);
     }
@@ -170,7 +170,7 @@ function SuperAdminContent() {
       }
       alert(t("deletedLeagueAlert").replace("{name}", name));
     } catch (err: any) {
-      alert(err.message || t("failedToDeleteLeague"));
+      alert(err.code ? t(err.code as any) : t("errUnknown"));
     }
   };
 
@@ -199,7 +199,7 @@ function SuperAdminContent() {
       setNewMemberNickname("");
       alert(t("memberSuccessAdded"));
     } catch (err: any) {
-      alert(err.message || t("failedToCreate"));
+      alert(err.code ? t(err.code as any) : t("errUnknown"));
     } finally {
       setAddingMember(false);
     }
@@ -213,7 +213,7 @@ function SuperAdminContent() {
       setParticipants((prev) => prev.filter((p) => p.id !== memberId));
       alert(t("memberRemoved"));
     } catch (err: any) {
-      alert(err.message || t("failedToRemoveMember"));
+      alert(err.code ? t(err.code as any) : t("errUnknown"));
     }
   };
 
@@ -226,7 +226,7 @@ function SuperAdminContent() {
       });
       alert(t("newPasscodeGenerated").replace("{name}", nickname).replace("{passcode}", data.passcode));
     } catch (err: any) {
-      alert(err.message || t("failedToResetPasscode"));
+      alert(err.code ? t(err.code as any) : t("errUnknown"));
     }
   };
 
@@ -257,7 +257,7 @@ function SuperAdminContent() {
       });
       alert(t("newPasscodeGenerated").replace("{name}", displayName).replace("{passcode}", data.passcode));
     } catch (err: any) {
-      alert(err.message || t("failedToResetPasscode"));
+      alert(err.code ? t(err.code as any) : t("errUnknown"));
     }
   };
 
@@ -269,7 +269,7 @@ function SuperAdminContent() {
       setGlobalUsers((prev) => prev.filter((u) => u.id !== userId));
       alert(t("deletedUserAlert").replace("{name}", displayName));
     } catch (err: any) {
-      alert(err.message || t("failedToDeleteUser"));
+      alert(err.code ? t(err.code as any) : t("errUnknown"));
     }
   };
 
@@ -286,7 +286,7 @@ function SuperAdminContent() {
       setGlobalUsers((prev) => prev.map((u) => u.id === userId ? { ...u, role: data.user.role } : u));
       alert(t("roleChangedAlert").replace("{name}", displayName).replace("{role}", data.user.role));
     } catch (err: any) {
-      alert(err.message || t("failedToUpdateRole"));
+      alert(err.code ? t(err.code as any) : t("errUnknown"));
     }
   };
 

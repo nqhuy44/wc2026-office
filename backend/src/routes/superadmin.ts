@@ -36,7 +36,7 @@ export async function superAdminRoutes(app: FastifyInstance) {
       });
       return { league };
     } catch (e) {
-      return reply.status(400).send({ error: "Bad Request", message: "Tạo league thất bại (có thể trùng slug)" });
+      return reply.status(400).send({ error: "Bad Request", code: "errCannotCreateLeague" });
     }
   });
 
@@ -45,7 +45,7 @@ export async function superAdminRoutes(app: FastifyInstance) {
 
     const league = await prisma.league.findUnique({ where: { id: leagueId } });
     if (!league) {
-      return reply.status(404).send({ error: "Not Found", message: "League không tồn tại" });
+      return reply.status(404).send({ error: "Not Found", code: "errLeagueNotFound" });
     }
 
     await prisma.league.delete({ where: { id: leagueId } });
@@ -59,7 +59,7 @@ export async function superAdminRoutes(app: FastifyInstance) {
 
     const league = await prisma.league.findUnique({ where: { id: leagueId } });
     if (!league) {
-      return reply.status(404).send({ error: "Not Found", message: "League không tồn tại" });
+      return reply.status(404).send({ error: "Not Found", code: "errLeagueNotFound" });
     }
 
     const members = await prisma.leagueMember.findMany({
@@ -93,7 +93,7 @@ export async function superAdminRoutes(app: FastifyInstance) {
 
     const league = await prisma.league.findUnique({ where: { id: leagueId } });
     if (!league) {
-      return reply.status(404).send({ error: "Not Found", message: "League không tồn tại" });
+      return reply.status(404).send({ error: "Not Found", code: "errLeagueNotFound" });
     }
 
     const user = await prisma.user.findUnique({
@@ -101,7 +101,7 @@ export async function superAdminRoutes(app: FastifyInstance) {
     });
 
     if (!user) {
-      return reply.status(404).send({ error: "Not Found", message: `Không tìm thấy tài khoản với username: ${username}. Hãy bảo người chơi đăng ký tài khoản trước.` });
+      return reply.status(404).send({ error: "Not Found", code: "errUserNotFound" });
     }
 
     try {
@@ -128,7 +128,7 @@ export async function superAdminRoutes(app: FastifyInstance) {
         }
       };
     } catch (e) {
-      return reply.status(400).send({ error: "Bad Request", message: "Tạo thành viên thất bại (người chơi đã ở trong league hoặc trùng nickname)" });
+      return reply.status(400).send({ error: "Bad Request", code: "errCannotCreateMember" });
     }
   });
 
@@ -140,11 +140,11 @@ export async function superAdminRoutes(app: FastifyInstance) {
       include: { user: true }
     });
     if (!member) {
-      return reply.status(404).send({ error: "Not Found", message: "Không tìm thấy thành viên trong League" });
+      return reply.status(404).send({ error: "Not Found", code: "errMemberNotFound" });
     }
 
     if (member.user.role === "SUPER_ADMIN") {
-      return reply.status(403).send({ error: "Forbidden", message: "Không thể xóa Super Admin khỏi League bằng endpoint này" });
+      return reply.status(403).send({ error: "Forbidden", code: "errCannotRemoveSuperAdmin" });
     }
 
     await prisma.leagueMember.delete({ where: { id: memberId } });
@@ -159,7 +159,7 @@ export async function superAdminRoutes(app: FastifyInstance) {
       include: { user: true }
     });
     if (!member) {
-      return reply.status(404).send({ error: "Not Found", message: "Không tìm thấy thành viên" });
+      return reply.status(404).send({ error: "Not Found", code: "errMemberNotFound" });
     }
 
     const newPasscode = generatePasscode();
@@ -205,7 +205,7 @@ export async function superAdminRoutes(app: FastifyInstance) {
 
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
-      return reply.status(404).send({ error: "Not Found", message: "Không tìm thấy người dùng" });
+      return reply.status(404).send({ error: "Not Found", code: "errUserNotFound" });
     }
 
     const newPasscode = generatePasscode();
@@ -233,12 +233,12 @@ export async function superAdminRoutes(app: FastifyInstance) {
 
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
-      return reply.status(404).send({ error: "Not Found", message: "Không tìm thấy người dùng" });
+      return reply.status(404).send({ error: "Not Found", code: "errUserNotFound" });
     }
 
     // Block deleting oneself
     if (currentUser && currentUser.id === userId) {
-      return reply.status(400).send({ error: "Bad Request", message: "Không thể tự xóa tài khoản của chính bạn" });
+      return reply.status(400).send({ error: "Bad Request", code: "errCannotDeleteSelf" });
     }
 
     await prisma.user.delete({ where: { id: userId } });
@@ -252,12 +252,12 @@ export async function superAdminRoutes(app: FastifyInstance) {
 
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
-      return reply.status(404).send({ error: "Not Found", message: "Không tìm thấy người dùng" });
+      return reply.status(404).send({ error: "Not Found", code: "errUserNotFound" });
     }
 
     // Block changing one's own role to avoid accidental lockout
     if (currentUser && currentUser.id === userId) {
-      return reply.status(400).send({ error: "Bad Request", message: "Không thể tự thay đổi vai trò của chính bạn" });
+      return reply.status(400).send({ error: "Bad Request", code: "errCannotChangeOwnRole" });
     }
 
     const updated = await prisma.user.update({

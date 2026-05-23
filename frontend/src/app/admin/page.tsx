@@ -65,6 +65,13 @@ interface AdminSettings {
   predictionLockMinutes: number;
 }
 
+interface TeamSimple {
+  id: string;
+  name: string;
+  shortName: string | null;
+  flagUrl: string | null;
+}
+
 const TEAM_FLAG_FALLBACK: Record<string, string> = {
   Argentina: "🇦🇷",
   Australia: "🇦🇺",
@@ -155,6 +162,10 @@ function AdminPageContent() {
   const [togglingMatchId, setTogglingMatchId] = useState<string | null>(null);
   const [predictionLockMinutes, setPredictionLockMinutes] = useState(15);
   const [settingsSaving, setSettingsSaving] = useState(false);
+  const [allTeams, setAllTeams] = useState<TeamSimple[]>([]);
+  const [championTeam, setChampionTeam] = useState<TeamSimple | null>(null);
+  const [championTeamId, setChampionTeamId] = useState<string>("");
+  const [championSaving, setChampionSaving] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -163,14 +174,21 @@ function AdminPageContent() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [partsData, matchesData, settingsData] = await Promise.all([
+      const [partsData, matchesData, settingsData, champData, teamsData] = await Promise.all([
         apiClient<{ participants: Participant[] }>("/admin/participants"),
         apiClient<{ matches: LeagueMatch[] }>("/matches?all=true"),
         apiClient<{ settings: AdminSettings }>("/admin/settings"),
+        apiClient<{ myPick: null; championTeam: TeamSimple | null }>("/champion-pick").catch(() => null),
+        apiClient<{ teams: TeamSimple[] }>("/teams").catch(() => ({ teams: [] })),
       ]);
       setParticipants(partsData.participants);
       setMatches(matchesData.matches);
       setPredictionLockMinutes(settingsData.settings.predictionLockMinutes);
+      setAllTeams(teamsData.teams);
+      if (champData?.championTeam) {
+        setChampionTeam(champData.championTeam);
+        setChampionTeamId(champData.championTeam.id);
+      }
 
       // Initialize manual score inputs
       const initialScores: Record<string, { home: number | ""; away: number | "" }> = {};
@@ -196,7 +214,7 @@ function AdminPageContent() {
       setSyncMsg(data.message);
       loadData(); // reload to get new matches
     } catch (err: any) {
-      setSyncMsg(t("syncFailed").replace("{error}", err.message));
+      setSyncMsg(err.code ? t(err.code as any) : t("errUnknown"));
     } finally {
       setSyncing(false);
     }
@@ -221,7 +239,7 @@ function AdminPageContent() {
       setNickname("");
       alert(data.message || t("memberSuccessAdded"));
     } catch (err: any) {
-      alert(err.message || t("failedToCreate"));
+      alert(err.code ? t(err.code as any) : t("errUnknown"));
     } finally {
       setCreating(false);
     }
@@ -235,7 +253,17 @@ function AdminPageContent() {
       );
       setParticipants(prev => prev.map(p => p.id === memberId ? { ...p, contributionStatus: data.participant.contributionStatus } : p));
     } catch (err: any) {
-      alert(err.message || t("contributionToggleFailed"));
+      alert(err.code ? t(err.code as any) : t("errUnknown"));
+    }
+  };
+
+  const handleResetPasscode = async (memberId: string, name: string) => {
+    if (!confirm(t("resetPasscodeConfirm").replace("{name}", name))) return;
+    try {
+      const data = await apiClient<{ passcode: string; nickname: string }>(`/admin/participants/${memberId}/reset-passcode`, { method: "POST" });
+      alert(t("newPasscodeGenerated").replace("{name}", data.nickname).replace("{passcode}", data.passcode));
+    } catch (err: any) {
+      alert(err.code ? t(err.code as any) : t("errUnknown"));
     }
   };
 
@@ -248,7 +276,7 @@ function AdminPageContent() {
       setParticipants(prev => prev.filter(p => p.id !== memberId));
       alert(data.message || t("memberRemoved"));
     } catch (err: any) {
-      alert(err.message || t("failedToRemoveMember"));
+      alert(err.code ? t(err.code as any) : t("errUnknown"));
     }
   };
 
@@ -278,9 +306,25 @@ function AdminPageContent() {
       alert(t("scoreSubmitted"));
       loadData(); // Reload to refresh statuses
     } catch (err: any) {
-      alert(err.message || t("failedToSaveScore"));
+      alert(err.code ? t(err.code as any) : t("errUnknown"));
     } finally {
       setScoringId(null);
+    }
+  };
+
+  const handleSaveChampionTeam = async () => {
+    setChampionSaving(true);
+    try {
+      const data = await apiClient<{ championTeam: TeamSimple | null }>("/admin/champion-team", {
+        method: "PUT",
+        json: { teamId: championTeamId || null }
+      });
+      setChampionTeam(data.championTeam);
+      alert(t("adminChampionSaved"));
+    } catch (err: any) {
+      alert(err.code ? t(err.code as any) : t("errUnknown"));
+    } finally {
+      setChampionSaving(false);
     }
   };
 
@@ -297,7 +341,7 @@ function AdminPageContent() {
       alert(data.message || t("settingsSaved"));
       await loadData();
     } catch (err: any) {
-      alert(err.message || t("settingsSaveFailed"));
+      alert(err.code ? t(err.code as any) : t("errUnknown"));
     } finally {
       setSettingsSaving(false);
     }
@@ -540,12 +584,20 @@ function AdminPageContent() {
                           </button>
                         </td>
                         <td className="px-6 py-4 text-right pr-8">
-                          <button
-                            onClick={() => handleRemoveParticipant(p.id, p.nickname)}
-                            className="text-xs font-bold text-red-600 hover:text-red-800 transition-colors py-1 px-2 hover:bg-red-50 rounded"
-                          >
-                            {t("btnRemove")}
-                          </button>
+                          <div className="inline-flex items-center gap-2 justify-end">
+                            <button
+                              onClick={() => handleResetPasscode(p.id, p.nickname)}
+                              className="text-xs font-bold text-amber-600 hover:text-amber-800 transition-colors py-1 px-2 hover:bg-amber-50 rounded"
+                            >
+                              {t("resetPasscodeBtn")}
+                            </button>
+                            <button
+                              onClick={() => handleRemoveParticipant(p.id, p.nickname)}
+                              className="text-xs font-bold text-red-600 hover:text-red-800 transition-colors py-1 px-2 hover:bg-red-50 rounded"
+                            >
+                              {t("btnRemove")}
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -791,7 +843,7 @@ function AdminPageContent() {
                                               )
                                             );
                                           } catch (err: any) {
-                                            alert(err.message || "Could not unlock predictions");
+                                            alert(err.code ? t(err.code as any) : t("errUnknown"));
                                           } finally {
                                             setTogglingMatchId(null);
                                           }
@@ -820,7 +872,7 @@ function AdminPageContent() {
                                                 )
                                               );
                                             } catch (err: any) {
-                                              alert(err.message || t("togglePredictionFailed"));
+                                              alert(err.code ? t(err.code as any) : t("errUnknown"));
                                             } finally {
                                               setTogglingMatchId(null);
                                             }
@@ -852,7 +904,7 @@ function AdminPageContent() {
                                                   )
                                                 );
                                               } catch (err: any) {
-                                                alert(err.message || "Could not lock predictions");
+                                                alert(err.code ? t(err.code as any) : t("errUnknown"));
                                               } finally {
                                                 setTogglingMatchId(null);
                                               }
@@ -1004,6 +1056,41 @@ function AdminPageContent() {
                 <CheckCircle size={14} />
                 {settingsSaving ? t("saving") : t("saveSettings")}
               </button>
+
+              {/* ─── Champion Team ─── */}
+              <div className="border-t border-border pt-5 mt-2">
+                <h4 className="text-[13px] font-extrabold text-foreground mb-1 flex items-center gap-1.5">
+                  🏆 {t("adminSetChampion")}
+                </h4>
+                <p className="text-[12px] text-muted-foreground mb-3">{t("adminSetChampionSub")}</p>
+                {championTeam && (
+                  <div className="flex items-center gap-2 mb-3 text-[13px] font-bold" style={{ color: '#F57F17' }}>
+                    {championTeam.flagUrl && <img src={championTeam.flagUrl} alt="" className="w-5 h-5 object-contain" />}
+                    {t("championPickConfirmed")}: {championTeam.name}
+                  </div>
+                )}
+                <div className="flex items-center gap-2 max-w-sm">
+                  <select
+                    value={championTeamId}
+                    onChange={(e) => setChampionTeamId(e.target.value)}
+                    className="flex-1 min-h-[36px] px-3 py-1.5 border border-border rounded-lg text-[13px] font-semibold bg-white focus:outline-none focus:border-primary"
+                  >
+                    <option value="">{t("adminChampionNone")}</option>
+                    {allTeams.map(team => (
+                      <option key={team.id} value={team.id}>{team.name}</option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={handleSaveChampionTeam}
+                    disabled={championSaving}
+                    className="min-h-[36px] px-4 py-1.5 rounded-lg text-[13px] font-bold text-white disabled:opacity-50"
+                    style={{ background: 'linear-gradient(135deg, #F57F17, #E65100)' }}
+                  >
+                    {championSaving ? t("saving") : t("adminChampionSave")}
+                  </button>
+                </div>
+              </div>
             </div>
           </article>
         )}

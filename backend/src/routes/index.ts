@@ -6,6 +6,7 @@ import { predictionRoutes } from "./predictions.js";
 import { leaderboardRoutes } from "./leaderboard.js";
 import { adminRoutes } from "./admin.js";
 import { superAdminRoutes } from "./superadmin.js";
+import { championRoutes } from "./champion.js";
 
 export async function registerRoutes(app: FastifyInstance) {
   await app.register(healthRoutes);
@@ -15,4 +16,5 @@ export async function registerRoutes(app: FastifyInstance) {
   await app.register(leaderboardRoutes, { prefix: "/api" });
   await app.register(adminRoutes, { prefix: "/api" });
   await app.register(superAdminRoutes, { prefix: "/api" });
+  await app.register(championRoutes, { prefix: "/api" });
 }

@@ -14,26 +14,47 @@ interface LeaderboardItem {
   totalPredictions: number;
 }
 
-interface Participant {
+interface Team {
   id: string;
+  name: string;
+  shortName: string | null;
+  flagUrl: string | null;
+}
+
+interface ChampionPickRow {
+  memberId: string;
   nickname: string;
+  team: Team;
+  isCorrect: boolean | null;
+}
+
+interface ChampionData {
+  isLocked: boolean;
+  myPick: { teamId: string; team: Team } | null;
+  championTeam: Team | null;
+  allPicks: ChampionPickRow[];
 }
 
 export default function LeaderboardPage() {
   const [leaderboard, setLeaderboard] = useState<LeaderboardItem[]>([]);
-  const [me, setMe] = useState<Participant | null>(null);
+  const [myNickname, setMyNickname] = useState<string>("");
+  const [champion, setChampion] = useState<ChampionData | null>(null);
   const [loading, setLoading] = useState(true);
   const { language, t } = useLanguage();
 
   useEffect(() => {
     async function load() {
       try {
-        const [lbData, meData] = await Promise.all([
+        const [lbData, meData, champData] = await Promise.all([
           apiClient<{ leaderboard: LeaderboardItem[] }>("/leaderboard"),
-          apiClient<{ participant: Participant }>("/auth/me"),
+          apiClient<{ user: { memberships: { nickname: string; leagueId: string }[] } }>("/auth/me"),
+          apiClient<ChampionData>("/champion-pick").catch(() => null),
         ]);
         setLeaderboard(lbData.leaderboard);
-        setMe(meData.participant);
+        const activeLeagueId = typeof window !== "undefined" ? localStorage.getItem("activeLeagueId") : null;
+        const activeMembership = meData.user.memberships.find(m => m.leagueId === activeLeagueId);
+        setMyNickname(activeMembership?.nickname ?? "");
+        setChampion(champData);
       } catch (err) {
         console.error("Failed to load leaderboard:", err);
       } finally {
@@ -44,8 +65,8 @@ export default function LeaderboardPage() {
   }, []);
 
   const maxPts = leaderboard.length > 0 ? leaderboard[0].totalPoints : 1;
-  const myRank = leaderboard.findIndex((item) => item.nickname === me?.nickname) + 1;
-  const myItem = leaderboard.find((item) => item.nickname === me?.nickname);
+  const myRank = leaderboard.findIndex((item) => item.nickname === myNickname) + 1;
+  const myItem = leaderboard.find((item) => item.nickname === myNickname);
   const leader = leaderboard[0];
 
   return (
@@ -107,7 +128,7 @@ export default function LeaderboardPage() {
               <tbody>
                 {leaderboard.map((item, index) => {
                   const rank = index + 1;
-                  const isMe = item.nickname === me?.nickname;
+                  const isMe = item.nickname === myNickname;
                   const wrongCount = item.totalPredictions - item.exactMatches - item.correctResults;
 
                   return (
@@ -119,12 +140,19 @@ export default function LeaderboardPage() {
                         {rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : ''}
                       </td>
                       <td style={{ fontWeight: isMe ? 700 : 500, fontSize: '14px', color: isMe ? '#2F7D5C' : '#1f2937' }}>
-                        {item.nickname}
-                        {isMe && (
-                          <span className="inline-flex items-center gap-1 ml-2 text-[9px] font-bold bg-green-100 text-green-700 px-1.5 py-0.5 rounded uppercase tracking-wider" style={{ color: '#2F7D5C', backgroundColor: '#E8F5E9' }}>
-                            {t("youLabel")}
-                          </span>
-                        )}
+                        <span className="flex items-center gap-1.5 flex-wrap">
+                          {item.nickname}
+                          {isMe && (
+                            <span className="inline-flex items-center gap-1 text-[9px] font-bold bg-green-100 text-green-700 px-1.5 py-0.5 rounded uppercase tracking-wider" style={{ color: '#2F7D5C', backgroundColor: '#E8F5E9' }}>
+                              {t("youLabel")}
+                            </span>
+                          )}
+                          {champion?.championTeam && champion.allPicks.find(p => p.nickname === item.nickname && p.isCorrect) && (
+                            <span className="inline-flex items-center text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider" style={{ background: '#FFF8E1', color: '#F57F17', border: '1px solid #FFE082' }}>
+                              {t("championBadge")}
+                            </span>
+                          )}
+                        </span>
                       </td>
                       <td className="td-center" style={{ fontSize: '16px', fontWeight: rank <= 3 ? 800 : 700, color: '#111827' }}>
                         {item.totalPoints}
@@ -159,6 +187,89 @@ export default function LeaderboardPage() {
               <span>✗ {t("ptsRuleWrong")}</span>
             </div>
           </div>
+
+          {/* ─── Champion Pick Table ─── */}
+          {champion && (
+            <div className="mt-8">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-[18px] font-bold text-foreground flex items-center gap-2">
+                  🏆 {t("championPickTableTitle")}
+                </h2>
+                {champion.championTeam && (
+                  <span className="flex items-center gap-2 text-[13px] font-bold px-3 py-1.5 rounded-lg" style={{ background: '#FFF8E1', color: '#F57F17', border: '1px solid #FFE082' }}>
+                    {champion.championTeam.flagUrl && (
+                      <img src={champion.championTeam.flagUrl} alt="" className="w-5 h-5 object-contain" />
+                    )}
+                    {t("championPickConfirmed")}: {champion.championTeam.name}
+                  </span>
+                )}
+              </div>
+
+              <div className="kp-card" style={{ padding: 0, overflow: 'hidden' }}>
+                {!champion.isLocked && champion.allPicks.length === 0 ? (
+                  <p className="text-center text-[13px] text-muted-foreground py-10">
+                    {t("championPickNotRevealed")}
+                  </p>
+                ) : champion.allPicks.length === 0 ? (
+                  <p className="text-center text-[13px] text-muted-foreground py-10">
+                    {t("championPickNoData")}
+                  </p>
+                ) : (
+                  <table className="kp-table">
+                    <thead>
+                      <tr>
+                        <th>{t("championPickColMember")}</th>
+                        <th>{t("championPickColTeam")}</th>
+                        <th className="th-center">{t("championPickColResult")}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {champion.allPicks.map((row) => {
+                        const isMe = row.nickname === myNickname;
+                        return (
+                          <tr key={row.memberId} className={isMe ? "bg-green-50/50" : "hover:bg-gray-50"}>
+                            <td style={{ fontWeight: isMe ? 700 : 500, fontSize: '14px', color: isMe ? '#2F7D5C' : '#1f2937' }}>
+                              {row.nickname}
+                              {isMe && (
+                                <span className="inline-flex items-center gap-1 ml-2 text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider" style={{ color: '#2F7D5C', backgroundColor: '#E8F5E9' }}>
+                                  {t("youLabel")}
+                                </span>
+                              )}
+                            </td>
+                            <td>
+                              <span className="flex items-center gap-2 text-[13px] font-semibold">
+                                {row.team.flagUrl ? (
+                                  <img src={row.team.flagUrl} alt="" className="w-5 h-5 object-contain rounded-sm" />
+                                ) : (
+                                  <span className="w-5 h-5 rounded-sm bg-gray-100 flex items-center justify-center text-[10px]">
+                                    {row.team.shortName?.slice(0,2) ?? row.team.name.slice(0,2)}
+                                  </span>
+                                )}
+                                {row.team.name}
+                              </span>
+                            </td>
+                            <td className="td-center">
+                              {row.isCorrect === null ? (
+                                <span className="text-[11px] font-semibold text-gray-400">
+                                  {t("championPickPending")}
+                                </span>
+                              ) : row.isCorrect ? (
+                                <span className="inline-flex items-center text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: '#FFF8E1', color: '#F57F17', border: '1px solid #FFE082' }}>
+                                  {t("championBadge")}
+                                </span>
+                              ) : (
+                                <span className="text-[11px] font-semibold text-gray-400">✗</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+          )}
         </>
       )}
     </NavigationShell>

@@ -33,7 +33,7 @@ export default function RegisterPage() {
       });
       router.push("/dashboard");
     } catch (err: any) {
-      setError(err.message || t("registerFailed"));
+      setError(err.code ? t(err.code as any) : t("errUnknown"));
     } finally {
       setLoading(false);
     }

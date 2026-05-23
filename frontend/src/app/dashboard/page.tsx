@@ -69,6 +69,21 @@ interface User {
   memberships: Membership[];
 }
 
+interface TeamSimple {
+  id: string;
+  name: string;
+  shortName: string | null;
+  flagUrl: string | null;
+  countryCode: string | null;
+}
+
+interface ChampionData {
+  isLocked: boolean;
+  lockAt: string;
+  myPick: { teamId: string; team: TeamSimple } | null;
+  championTeam: TeamSimple | null;
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const [matches, setMatches] = useState<LeagueMatch[]>([]);
@@ -77,6 +92,10 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
   const [activeLeagueName, setActiveLeagueName] = useState("");
+  const [champion, setChampion] = useState<ChampionData | null>(null);
+  const [allTeams, setAllTeams] = useState<TeamSimple[]>([]);
+  const [pickSaving, setPickSaving] = useState(false);
+  const [pickTeamId, setPickTeamId] = useState<string>("");
   const { language, t } = useLanguage();
 
   const stageLabel = (stage: string, groupName: string | null): string => {
@@ -109,12 +128,17 @@ export default function DashboardPage() {
           }
 
           // Fetch scoped league data
-          const [matchData, lbData] = await Promise.all([
+          const [matchData, lbData, champData, teamsData] = await Promise.all([
             apiClient<{ matches: LeagueMatch[] }>("/matches"),
             apiClient<{ leaderboard: LeaderboardItem[] }>("/leaderboard"),
+            apiClient<ChampionData>("/champion-pick").catch(() => null),
+            apiClient<{ teams: TeamSimple[] }>("/teams").catch(() => ({ teams: [] })),
           ]);
           setMatches(matchData.matches);
           setLeaderboard(lbData.leaderboard);
+          setChampion(champData);
+          setAllTeams(teamsData.teams);
+          setPickTeamId(champData?.myPick?.teamId ?? "");
         }
       } catch (err) {
         console.error("Failed to load dashboard data:", err);
@@ -124,6 +148,23 @@ export default function DashboardPage() {
     }
     loadData();
   }, []);
+
+  const handleSaveChampionPick = async () => {
+    if (!pickTeamId) return;
+    setPickSaving(true);
+    try {
+      const data = await apiClient<{ pick: { teamId: string; team: TeamSimple } }>("/champion-pick", {
+        method: "PUT",
+        json: { teamId: pickTeamId },
+      });
+      setChampion(prev => prev ? { ...prev, myPick: data.pick } : prev);
+      alert(t("championPickSaved"));
+    } catch (err: any) {
+      alert(err.code ? t(err.code as any) : t("errUnknown"));
+    } finally {
+      setPickSaving(false);
+    }
+  };
 
   const handleCopyUsername = () => {
     if (!me) return;
@@ -276,6 +317,81 @@ export default function DashboardPage() {
               {t("goodLuck")}
             </div>
           </div>
+
+          {/* ─── Champion Pick Card ─── */}
+          {champion && (
+            <div className="kp-card" style={{ border: '2px solid #FFD700', boxShadow: '0 2px 8px rgba(255,215,0,0.15)', padding: '20px 24px' }}>
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h3 className="text-[15px] font-bold text-foreground flex items-center gap-1.5">
+                    🏆 {t("championPickTitle")}
+                  </h3>
+                  <p className="text-[12px] text-muted-foreground mt-0.5">
+                    {t("championPickSub")}
+                  </p>
+                </div>
+                {champion.isLocked && (
+                  <span className="text-[11px] font-bold px-2 py-1 rounded-full bg-gray-100 text-gray-500 border border-gray-200">
+                    🔒 {t("championPickLocked")}
+                  </span>
+                )}
+              </div>
+
+              {/* Confirmed champion banner */}
+              {champion.championTeam && (
+                <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-lg text-[13px] font-bold" style={{ background: '#FFF8E1', color: '#F57F17', border: '1px solid #FFE082' }}>
+                  {champion.championTeam.flagUrl && (
+                    <img src={champion.championTeam.flagUrl} alt="" className="w-5 h-5 object-contain" />
+                  )}
+                  {t("championPickConfirmed")}: <span className="font-extrabold">{champion.championTeam.name}</span>
+                  {champion.myPick?.teamId === champion.championTeam.id && (
+                    <span className="ml-auto text-[11px] px-2 py-0.5 rounded-full font-bold" style={{ background: '#FFF3E0', color: '#E65100', border: '1px solid #FFCC80' }}>
+                      {t("championBadge")}
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {/* My current pick display */}
+              {champion.myPick ? (
+                <div className="flex items-center gap-3 mb-3">
+                  <span className="text-[12px] text-muted-foreground font-semibold">{t("championPickYourPick")}:</span>
+                  <span className="flex items-center gap-1.5 text-[13px] font-bold text-foreground">
+                    {champion.myPick.team.flagUrl && (
+                      <img src={champion.myPick.team.flagUrl} alt="" className="w-5 h-5 object-contain rounded-sm" />
+                    )}
+                    {champion.myPick.team.name}
+                  </span>
+                </div>
+              ) : !champion.isLocked && (
+                <p className="text-[12px] text-amber-600 font-semibold mb-3">⚠ {t("championPickNoPick")}</p>
+              )}
+
+              {/* Pick selector (only when not locked) */}
+              {!champion.isLocked && allTeams.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <select
+                    value={pickTeamId}
+                    onChange={(e) => setPickTeamId(e.target.value)}
+                    className="flex-1 min-h-[36px] px-3 py-1.5 border border-border rounded-lg text-[13px] font-semibold bg-white focus:outline-none focus:border-primary"
+                  >
+                    <option value="">{t("championPickSelectTeam")}</option>
+                    {allTeams.map(team => (
+                      <option key={team.id} value={team.id}>{team.name}</option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={handleSaveChampionPick}
+                    disabled={!pickTeamId || pickSaving || pickTeamId === champion.myPick?.teamId}
+                    className="min-h-[36px] px-4 py-1.5 rounded-lg text-[13px] font-bold text-white transition-all disabled:opacity-50"
+                    style={{ background: 'linear-gradient(135deg, #2F7D5C, #1a5c40)' }}
+                  >
+                    {pickSaving ? "..." : t("championPickSave")}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Live Match Card(s) */}
           {liveMatches.map((lm) => (

@@ -5,13 +5,13 @@ import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { apiClient } from "@/lib/api-client";
 import { useLanguage } from "@/context/language-context";
-import { 
-  LayoutDashboard, 
-  Calendar, 
-  Trophy, 
+import {
+  LayoutDashboard,
+  Calendar,
+  Trophy,
   BarChart3,
   Target,
-  LogOut, 
+  LogOut,
   Menu,
   X,
   Users,
@@ -22,7 +22,8 @@ import {
   Building2,
   ChevronDown,
   Globe,
-  UserPlus
+  UserPlus,
+  KeyRound,
 } from "lucide-react";
 
 interface Membership {
@@ -50,6 +51,12 @@ function NavigationShellContent({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [changePasscodeOpen, setChangePasscodeOpen] = useState(false);
+  const [cpCurrent, setCpCurrent] = useState("");
+  const [cpNew, setCpNew] = useState("");
+  const [cpConfirm, setCpConfirm] = useState("");
+  const [cpError, setCpError] = useState("");
+  const [cpSaving, setCpSaving] = useState(false);
   const [activeLeagueId, setActiveLeagueId] = useState<string>("");
   const router = useRouter();
   const pathname = usePathname();
@@ -103,6 +110,29 @@ function NavigationShellContent({ children }: { children: React.ReactNode }) {
     setActiveLeagueId(leagueId);
     // Reload to refresh all data scopes with the new league
     window.location.reload();
+  };
+
+  const handleChangePasscode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCpError("");
+    if (cpNew !== cpConfirm) {
+      setCpError(t("passcodesMismatch"));
+      return;
+    }
+    setCpSaving(true);
+    try {
+      await apiClient("/auth/me/change-passcode", {
+        method: "POST",
+        json: { currentPasscode: cpCurrent, newPasscode: cpNew },
+      });
+      setChangePasscodeOpen(false);
+      setCpCurrent(""); setCpNew(""); setCpConfirm("");
+      alert(t("passcodeChanged"));
+    } catch (err: any) {
+      setCpError(err.code ? t(err.code as any) : t("errUnknown"));
+    } finally {
+      setCpSaving(false);
+    }
   };
 
   if (loading) {
@@ -334,6 +364,13 @@ function NavigationShellContent({ children }: { children: React.ReactNode }) {
             </button>
           </div>
           <button
+            onClick={() => { setChangePasscodeOpen(true); setCpError(""); setCpCurrent(""); setCpNew(""); setCpConfirm(""); }}
+            className="flex items-center gap-[10px] text-[13px] text-muted-foreground hover:text-primary transition-colors w-full"
+          >
+            <KeyRound size={14} />
+            {t("changePasscodeSidebarBtn")}
+          </button>
+          <button
             onClick={handleLogout}
             className="flex items-center gap-[10px] text-[13px] text-muted-foreground hover:text-destructive transition-colors w-full"
           >
@@ -352,10 +389,82 @@ function NavigationShellContent({ children }: { children: React.ReactNode }) {
 
       {/* Mobile Sidebar Overlay */}
       {sidebarOpen && (
-        <div 
+        <div
           onClick={() => setSidebarOpen(false)}
           className="fixed inset-0 z-30 bg-black/10 backdrop-blur-[1px] md:hidden"
         />
+      )}
+
+      {/* Change Passcode Modal */}
+      {changePasscodeOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[2px] px-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 border border-border">
+            <div className="flex items-center gap-2 mb-5">
+              <KeyRound size={18} style={{ color: "#2F7D5C" }} />
+              <h2 className="text-[17px] font-bold text-foreground">{t("changePasscodeTitle")}</h2>
+            </div>
+            <form onSubmit={handleChangePasscode} className="space-y-4">
+              <div className="grid gap-1.5">
+                <label className="text-[11px] font-extrabold text-muted-foreground uppercase tracking-wider">
+                  {t("currentPasscodeLabel")}
+                </label>
+                <input
+                  type="password"
+                  required
+                  value={cpCurrent}
+                  onChange={(e) => setCpCurrent(e.target.value)}
+                  className="w-full min-h-[40px] px-3 py-2 bg-white border border-border rounded-lg text-foreground outline-none focus:border-primary text-sm transition-all"
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <label className="text-[11px] font-extrabold text-muted-foreground uppercase tracking-wider">
+                  {t("newPasscodeLabel")}
+                </label>
+                <input
+                  type="password"
+                  required
+                  minLength={3}
+                  value={cpNew}
+                  onChange={(e) => setCpNew(e.target.value)}
+                  className="w-full min-h-[40px] px-3 py-2 bg-white border border-border rounded-lg text-foreground outline-none focus:border-primary text-sm transition-all"
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <label className="text-[11px] font-extrabold text-muted-foreground uppercase tracking-wider">
+                  {t("confirmNewPasscodeLabel")}
+                </label>
+                <input
+                  type="password"
+                  required
+                  minLength={3}
+                  value={cpConfirm}
+                  onChange={(e) => setCpConfirm(e.target.value)}
+                  className="w-full min-h-[40px] px-3 py-2 bg-white border border-border rounded-lg text-foreground outline-none focus:border-primary text-sm transition-all"
+                />
+              </div>
+              {cpError && (
+                <p className="text-[13px] text-red-600 font-semibold">{cpError}</p>
+              )}
+              <div className="flex gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setChangePasscodeOpen(false)}
+                  className="flex-1 min-h-[38px] px-4 py-2 border border-border bg-white rounded-lg font-bold text-[13px] text-muted-foreground hover:bg-gray-50 transition-all"
+                >
+                  {t("cancel")}
+                </button>
+                <button
+                  type="submit"
+                  disabled={cpSaving}
+                  className="flex-1 min-h-[38px] px-4 py-2 text-white font-extrabold rounded-lg text-[13px] transition-all disabled:opacity-50"
+                  style={{ backgroundColor: "#2F7D5C" }}
+                >
+                  {cpSaving ? t("saving") : t("changePasscodeTitle")}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -80,7 +80,7 @@ export default function MatchDetailPage() {
       setToast(true);
       setTimeout(() => setToast(false), 4000);
     } catch (err: any) {
-      alert(err.message || t("failedToSavePrediction"));
+      alert(err.code ? t(err.code as any) : t("errUnknown"));
     } finally {
       setSaving(false);
     }

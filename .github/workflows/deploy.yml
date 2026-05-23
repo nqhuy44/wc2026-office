@@ -15,8 +15,8 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  BACKEND_IMAGE: docker.io/${{ vars.DOCKERHUB_USERNAME }}/wcleague-be
-  FRONTEND_IMAGE: docker.io/${{ vars.DOCKERHUB_USERNAME }}/wcleague-fe
+  BACKEND_IMAGE: docker.io/${{ vars.DOCKERHUB_USERNAME }}/wcleague-api
+  FRONTEND_IMAGE: docker.io/${{ vars.DOCKERHUB_USERNAME }}/wcleague-dashboard
 
 jobs:
   build-push:
@@ -84,8 +84,8 @@ jobs:
           SHA: ${{ needs.build-push.outputs.short_sha }}
           DUSER: ${{ vars.DOCKERHUB_USERNAME }}
         run: |
-          sed -i "s|image: docker.io/.*/wcleague-be:.*|image: docker.io/${DUSER}/wcleague-be:${SHA}|" docker-compose.yml
-          sed -i "s|image: docker.io/.*/wcleague-fe:.*|image: docker.io/${DUSER}/wcleague-fe:${SHA}|" docker-compose.yml
+          sed -i "s|image: docker.io/.*/wcleague-api:.*|image: docker.io/${DUSER}/wcleague-api:${SHA}|" docker-compose.yml
+          sed -i "s|image: docker.io/.*/wcleague-dashboard:.*|image: docker.io/${DUSER}/wcleague-dashboard:${SHA}|" docker-compose.yml
 
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3

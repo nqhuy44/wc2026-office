@@ -210,7 +210,7 @@ export default function LoginPage() {
               color: '#2F7D5C', border: '1.5px solid #BBF7D0', background: '#F0FDF4',
             }}
           >
-            🆕 {t("register")}
+            {t("register")}
           </a>
         </div>
       </div>

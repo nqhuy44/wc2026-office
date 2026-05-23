@@ -23,19 +23,19 @@ export async function predictionRoutes(app: FastifyInstance) {
     });
 
     if (!leagueMatch || leagueMatch.leagueId !== leagueId) {
-      return reply.status(404).send({ error: "Not Found", message: "Trận đấu không tồn tại" });
+      return reply.status(404).send({ error: "Not Found", code: "errMatchNotFound" });
     }
 
     if (!leagueMatch.isPredictionEnabled || leagueMatch.status !== "OPEN") {
-      return reply.status(400).send({ error: "Bad Request", message: "Trận đấu không cho phép dự đoán lúc này" });
+      return reply.status(400).send({ error: "Bad Request", code: "errPredictionNotAllowed" });
     }
 
     if (leagueMatch.lockAt && leagueMatch.lockAt < new Date()) {
-      return reply.status(400).send({ error: "Bad Request", message: "Đã hết thời gian dự đoán" });
+      return reply.status(400).send({ error: "Bad Request", code: "errPredictionTimeExpired" });
     }
 
     if (leagueMatch.match.kickoffAt <= new Date()) {
-      return reply.status(400).send({ error: "Bad Request", message: "Trận đấu đã bắt đầu, không thể dự đoán" });
+      return reply.status(400).send({ error: "Bad Request", code: "errMatchAlreadyStarted" });
     }
 
     const prediction = await prisma.prediction.upsert({
@@ -70,7 +70,7 @@ export async function predictionRoutes(app: FastifyInstance) {
     });
 
     if (!leagueMatch || leagueMatch.leagueId !== request.leagueMember!.leagueId) {
-      return reply.status(404).send({ error: "Not Found", message: "Trận đấu không tồn tại" });
+      return reply.status(404).send({ error: "Not Found", code: "errMatchNotFound" });
     }
 
     // Only reveal other people's predictions if match is LOCKED or later

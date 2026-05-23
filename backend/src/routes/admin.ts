@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import z from "zod";
 import { prisma } from "../lib/prisma.js";
+import { hashString, generatePasscode } from "../lib/auth-utils.js";
 import { scoreMatch } from "../lib/scoring.js";
 import {
   PREDICTION_LOCK_SETTING_KEY,
@@ -74,7 +75,7 @@ export async function adminRoutes(app: FastifyInstance) {
     });
 
     if (!user) {
-      return reply.status(404).send({ error: "Not Found", message: `Không tìm thấy tài khoản với username: ${username}. Hãy bảo người chơi đăng ký tài khoản trước.` });
+      return reply.status(404).send({ error: "Not Found", code: "errUserNotFound" });
     }
 
     try {
@@ -102,7 +103,7 @@ export async function adminRoutes(app: FastifyInstance) {
         message: `Đã thêm ${member.nickname} vào giải đấu.`
       };
     } catch (e) {
-      return reply.status(400).send({ error: "Bad Request", message: "Không thể thêm người chơi (có thể người chơi đã ở trong giải đấu này hoặc bị trùng nickname)" });
+      return reply.status(400).send({ error: "Bad Request", code: "errCannotAddMember" });
     }
   });
 
@@ -116,7 +117,7 @@ export async function adminRoutes(app: FastifyInstance) {
     });
 
     if (!member) {
-      return reply.status(404).send({ error: "Not Found", message: "Không tìm thấy thành viên trong League" });
+      return reply.status(404).send({ error: "Not Found", code: "errMemberNotFound" });
     }
 
     const nextStatus = member.contributionStatus === "PAID" ? "UNPAID" : "PAID";
@@ -147,7 +148,7 @@ export async function adminRoutes(app: FastifyInstance) {
     });
 
     if (!member) {
-      return reply.status(404).send({ error: "Not Found", message: "Không tìm thấy thành viên trong League" });
+      return reply.status(404).send({ error: "Not Found", code: "errMemberNotFound" });
     }
 
     await prisma.leagueMember.delete({
@@ -160,12 +161,33 @@ export async function adminRoutes(app: FastifyInstance) {
     };
   });
 
-  // Mock route for compatibility (in global password system, league admins cannot reset passcodes)
   app.post("/admin/participants/:memberId/reset-passcode", { preHandler: [app.requireAdmin] }, async (request, reply) => {
-    return reply.status(400).send({ 
-      error: "Bad Request", 
-      message: "Trong hệ thống tài khoản toàn cục, người chơi tự quản lý mật khẩu của họ. League Admin không thể reset mật khẩu." 
+    const { memberId } = request.params as { memberId: string };
+    const leagueId = request.leagueMember!.leagueId;
+
+    const member = await prisma.leagueMember.findFirst({
+      where: { id: memberId, leagueId },
+      include: { user: true }
     });
+
+    if (!member) {
+      return reply.status(404).send({ error: "Not Found", code: "errMemberNotFound" });
+    }
+
+    const newPasscode = generatePasscode();
+    await prisma.user.update({
+      where: { id: member.userId },
+      data: { passcodeHash: hashString(newPasscode) }
+    });
+
+    await prisma.session.deleteMany({ where: { userId: member.userId } });
+
+    return {
+      participantId: member.id,
+      nickname: member.nickname,
+      passcode: newPasscode,
+      message: `Đã reset mật khẩu cho ${member.nickname} thành: ${newPasscode}`
+    };
   });
 
   // ─── Match Management ───
@@ -186,21 +208,21 @@ export async function adminRoutes(app: FastifyInstance) {
     });
 
     if (!leagueMatch) {
-      return reply.status(404).send({ error: "Not Found", message: "Trận đấu không tồn tại" });
+      return reply.status(404).send({ error: "Not Found", code: "errMatchNotFound" });
     }
 
     if (["LIVE", "FINISHED", "SCORED", "VOID"].includes(leagueMatch.status)) {
-      return reply.status(400).send({ error: "Bad Request", message: "Không thể thay đổi dự đoán cho trận đã bắt đầu hoặc đã kết thúc" });
+      return reply.status(400).send({ error: "Bad Request", code: "errMatchCannotToggle" });
     }
 
     if (leagueMatch.status === "LOCKED" && !isPredictionEnabled) {
-      return reply.status(400).send({ error: "Bad Request", message: "Trận đã khóa dự đoán, không thể đóng. Kết quả dự đoán đã khóa sẽ được giữ để tính điểm." });
+      return reply.status(400).send({ error: "Bad Request", code: "errMatchAlreadyLocked" });
     }
 
     const lockAt = leagueMatch.lockAt ?? await getLeagueLockAt(leagueId, leagueMatch.match.kickoffAt);
 
     if (isPredictionEnabled && lockAt <= new Date()) {
-      return reply.status(400).send({ error: "Bad Request", message: "Trận đã qua thời điểm khóa dự đoán" });
+      return reply.status(400).send({ error: "Bad Request", code: "errMatchPastLockTime" });
     }
 
     const updated = await prisma.$transaction(async (tx) => {
@@ -248,15 +270,15 @@ export async function adminRoutes(app: FastifyInstance) {
     });
 
     if (!leagueMatch) {
-      return reply.status(404).send({ error: "Not Found", message: "Trận đấu không tồn tại" });
+      return reply.status(404).send({ error: "Not Found", code: "errMatchNotFound" });
     }
 
     if (!leagueMatch.isPredictionEnabled) {
-      return reply.status(400).send({ error: "Bad Request", message: "Trận chưa được mở dự đoán" });
+      return reply.status(400).send({ error: "Bad Request", code: "errMatchNotOpen" });
     }
 
     if (["LIVE", "FINISHED", "SCORED", "VOID"].includes(leagueMatch.status)) {
-      return reply.status(400).send({ error: "Bad Request", message: "Trận đã bắt đầu hoặc đã kết thúc" });
+      return reply.status(400).send({ error: "Bad Request", code: "errMatchAlreadyStarted" });
     }
 
     const updated = await prisma.leagueMatch.update({
@@ -285,21 +307,21 @@ export async function adminRoutes(app: FastifyInstance) {
     });
 
     if (!leagueMatch) {
-      return reply.status(404).send({ error: "Not Found", message: "Trận đấu không tồn tại" });
+      return reply.status(404).send({ error: "Not Found", code: "errMatchNotFound" });
     }
 
     if (leagueMatch.status !== "LOCKED") {
-      return reply.status(400).send({ error: "Bad Request", message: "Chỉ có thể mở khóa trận đang LOCKED" });
+      return reply.status(400).send({ error: "Bad Request", code: "errMatchNotLocked" });
     }
 
     if (!leagueMatch.isPredictionEnabled) {
-      return reply.status(400).send({ error: "Bad Request", message: "Trận chưa được mở dự đoán" });
+      return reply.status(400).send({ error: "Bad Request", code: "errMatchNotOpen" });
     }
 
     const lockAt = await getLeagueLockAt(leagueId, leagueMatch.match.kickoffAt);
 
     if (lockAt <= new Date() || leagueMatch.match.kickoffAt <= new Date()) {
-      return reply.status(400).send({ error: "Bad Request", message: "Trận đã qua thời điểm khóa dự đoán hoặc đã bắt đầu" });
+      return reply.status(400).send({ error: "Bad Request", code: "errMatchPastKickoff" });
     }
 
     const updated = await prisma.leagueMatch.update({
@@ -329,15 +351,15 @@ export async function adminRoutes(app: FastifyInstance) {
     });
 
     if (!leagueMatch) {
-      return reply.status(404).send({ error: "Not Found", message: "Trận đấu không tồn tại trong League" });
+      return reply.status(404).send({ error: "Not Found", code: "errMatchNotFound" });
     }
 
     if (leagueMatch.match.kickoffAt > new Date()) {
-      return reply.status(400).send({ error: "Bad Request", message: "Chưa thể nhập tỉ số cho trận chưa bắt đầu" });
+      return reply.status(400).send({ error: "Bad Request", code: "errMatchNotStarted" });
     }
 
     if (leagueMatch.match.status === "SCORED") {
-      return reply.status(409).send({ error: "Conflict", message: "Trận đấu đã được chấm điểm. Không thể cập nhật tỉ số sau khi đã tính điểm dự đoán." });
+      return reply.status(409).send({ error: "Conflict", code: "errMatchAlreadyScored" });
     }
 
     const match = await prisma.match.update({
@@ -412,6 +434,28 @@ export async function adminRoutes(app: FastifyInstance) {
       },
       message: "Đã cập nhật cài đặt"
     };
+  });
+
+  // ─── Champion Team Management ───
+
+  app.put("/admin/champion-team", { preHandler: [app.requireAdmin] }, async (request, reply) => {
+    const leagueId = request.leagueMember!.leagueId;
+    const { teamId } = z.object({ teamId: z.string().nullable() }).parse(request.body);
+
+    if (teamId) {
+      const team = await prisma.team.findUnique({ where: { id: teamId } });
+      if (!team) {
+        return reply.status(404).send({ error: "Not Found", code: "errTeamNotFound" });
+      }
+    }
+
+    const league = await prisma.league.update({
+      where: { id: leagueId },
+      data: { championTeamId: teamId ?? null },
+      include: { championTeam: true }
+    });
+
+    return { championTeam: league.championTeam, message: "Đã cập nhật đội vô địch" };
   });
 
   // Sync matches from external API
