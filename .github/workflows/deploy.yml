@@ -79,14 +79,6 @@ jobs:
       - name: Checkout (for compose file)
         uses: actions/checkout@v4
 
-      - name: Pin image tags in compose file
-        env:
-          SHA: ${{ needs.build-push.outputs.short_sha }}
-          DUSER: ${{ vars.DOCKERHUB_USERNAME }}
-        run: |
-          sed -i "s|image: docker.io/.*/wcleague-api:.*|image: docker.io/${DUSER}/wcleague-api:${SHA}|" docker-compose.yml
-          sed -i "s|image: docker.io/.*/wcleague-dashboard:.*|image: docker.io/${DUSER}/wcleague-dashboard:${SHA}|" docker-compose.yml
-
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -97,8 +89,12 @@ jobs:
             set -euo pipefail
             cd /home/${{ secrets.VM_USER }}/wc-league
 
+            echo "==> Pinning image tags to ${{ needs.build-push.outputs.short_sha }}..."
+            sed -i "s|image: docker.io/.*/wcleague-api:.*|image: docker.io/${{ vars.DOCKERHUB_USERNAME }}/wcleague-api:${{ needs.build-push.outputs.short_sha }}|" docker-compose.yml
+            sed -i "s|image: docker.io/.*/wcleague-dashboard:.*|image: docker.io/${{ vars.DOCKERHUB_USERNAME }}/wcleague-dashboard:${{ needs.build-push.outputs.short_sha }}|" docker-compose.yml
+
             echo "==> Pulling new images..."
-            docker compose -f docker-compose.yml pull api dashboard
+            docker compose -f docker-compose.yml pull migrate api dashboard
 
             echo "==> Starting services..."
             docker compose -f docker-compose.yml up -d
