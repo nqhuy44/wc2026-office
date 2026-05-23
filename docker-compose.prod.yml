@@ -19,7 +19,8 @@ services:
     restart: "no"
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
-    command: sh -c "npx prisma migrate deploy"
+      SUPER_ADMIN_PASSCODE: ${SUPER_ADMIN_PASSCODE:-123456}
+    command: sh -c "npx prisma migrate deploy && node dist/seed.js"
     depends_on:
       postgres:
         condition: service_healthy

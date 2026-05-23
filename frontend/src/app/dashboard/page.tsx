@@ -291,7 +291,7 @@ export default function DashboardPage() {
           <div className="rounded-xl p-6 text-white relative overflow-hidden" style={{
             background: 'linear-gradient(135deg, #2F7D5C 0%, #1a5c40 100%)',
           }}>
-            <span className="absolute right-6 top-1/2 -translate-y-1/2 text-[64px] opacity-[0.12] pointer-events-none">🏢</span>
+            <span className="absolute right-6 top-1/2 -translate-y-1/2 text-[64px] opacity-[0.12] pointer-events-none">⚽</span>
             <div className="text-[13px] opacity-80 mb-1">
               {t("welcomeBack")}
             </div>

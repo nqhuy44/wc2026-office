@@ -75,7 +75,7 @@ export default function LoginPage() {
 
       {/* Floating background emojis */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        {['🏢','📊','💼','📝','🏢'].map((emoji, i) => (
+        {['⚽','🏆','🥅','📋','⚽'].map((emoji, i) => (
           <span
             key={i}
             className="absolute opacity-[0.04]"
@@ -100,7 +100,7 @@ export default function LoginPage() {
             background: 'linear-gradient(135deg, #2F7D5C, #1a5c40)',
             boxShadow: '0 8px 24px rgba(47,125,92,0.3)',
           }}>
-            🏢
+            ⚽
           </div>
           <div className="text-[28px] font-extrabold text-foreground" style={{ letterSpacing: '-0.5px' }}>{t("appName")}</div>
           <div className="text-[14px] text-muted-foreground mt-1.5">{t("appSub")}</div>
@@ -122,7 +122,7 @@ export default function LoginPage() {
                 type="text"
                 required
                 disabled={loading}
-                placeholder="e.g. nick_name"
+                placeholder="Enter Username"
                 value={username}
                 onChange={(e) => {
                   setUsername(e.target.value.toLowerCase().replace(/\s/g, '_'));

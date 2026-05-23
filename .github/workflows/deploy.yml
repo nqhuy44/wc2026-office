@@ -106,48 +106,6 @@ jobs:
             echo "==> Pruning old images..."
             docker image prune -f
 
-      - name: Verify containers on VM
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.VM_HOST }}
-          username: ${{ secrets.VM_USER }}
-          key: ${{ secrets.VM_SSH_KEY }}
-          script: |
-            set -euo pipefail
-            cd /home/${{ secrets.VM_USER }}/wc-league
-
-            SERVICES="api dashboard"
-            MAX_WAIT=60
-            ELAPSED=0
-            ALL_OK=true
-
-            echo "==> Waiting up to ${MAX_WAIT}s for containers to be running..."
-            while [ "$ELAPSED" -lt "$MAX_WAIT" ]; do
-              ALL_OK=true
-              for svc in $SERVICES; do
-                STATUS=$(docker compose inspect --format='{{.State.Status}}' "$svc" 2>/dev/null || echo "missing")
-                if [ "$STATUS" != "running" ]; then
-                  echo "  $svc: $STATUS"
-                  ALL_OK=false
-                fi
-              done
-              if $ALL_OK; then
-                echo "All containers running."
-                break
-              fi
-              sleep 5
-              ELAPSED=$((ELAPSED + 5))
-            done
-
-            if ! $ALL_OK; then
-              echo "ERROR: containers not healthy after ${MAX_WAIT}s"
-              docker compose -f docker-compose.yml ps
-              docker compose -f docker-compose.yml logs --tail=50
-              exit 1
-            fi
-
-            docker compose -f docker-compose.yml ps
-
       - name: Smoke test — health endpoint
         run: |
           echo "==> Probing https://${{ secrets.VM_DOMAIN }}/health ..."

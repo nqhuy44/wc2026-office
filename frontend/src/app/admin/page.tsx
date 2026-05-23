@@ -500,7 +500,7 @@ function AdminPageContent() {
                   </label>
                   <input
                     type="text"
-                    placeholder="e.g. Nick name"
+                    placeholder="Nick name"
                     value={nickname}
                     onChange={(e) => setNickname(e.target.value)}
                     className="w-full min-h-[40px] px-3 py-2 bg-white border border-border rounded-lg text-foreground outline-none focus:border-primary transition-all text-xs"

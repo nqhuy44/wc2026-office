@@ -185,7 +185,7 @@ function NavigationShellContent({ children }: { children: React.ReactNode }) {
       {/* ─── Mobile Top Bar ─── */}
       <header className="fixed top-0 left-0 right-0 z-40 flex h-[56px] items-center justify-between border-b border-border bg-white px-4 md:hidden">
         <div className="flex items-center gap-2">
-          <span className="text-xl">🏢</span>
+          <span className="text-xl">⚽</span>
           <div>
             <div className="text-[15px] font-bold text-primary leading-tight">{t("appName")}</div>
             <div className="text-[10px] text-muted-foreground">{t("appSub")}</div>
@@ -206,7 +206,7 @@ function NavigationShellContent({ children }: { children: React.ReactNode }) {
         {/* Logo */}
         <div className="px-5 py-4 border-b border-border">
           <div className="flex items-center gap-2">
-            <span className="text-xl">🏢</span>
+            <span className="text-xl">⚽</span>
             <div>
               <div className="text-[16px] font-bold text-primary">{t("appName")}</div>
               <div className="text-[11px] text-muted-foreground">{t("appSub")}</div>
