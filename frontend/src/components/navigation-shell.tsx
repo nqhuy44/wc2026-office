@@ -24,6 +24,7 @@ import {
   Globe,
   UserPlus,
   KeyRound,
+  BookOpen,
 } from "lucide-react";
 
 interface Membership {
@@ -161,6 +162,7 @@ function NavigationShellContent({ children }: { children: React.ReactNode }) {
     { name: t("standings"), href: "/standings", icon: Trophy },
     { name: t("leaderboard"), href: "/leaderboard", icon: BarChart3 },
     { name: t("predictions"), href: "/predictions", icon: Target },
+    { name: t("rules"), href: "/rules", icon: BookOpen },
   ];
 
   const adminMenuItems = [
