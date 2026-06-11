@@ -98,7 +98,7 @@ export const vi = {
   noMembers: "Giải đấu chưa có thành viên nào. Hãy thêm thành viên bằng form bên cạnh!",
   confirmRemove: "Bạn có chắc muốn xóa thành viên \"{name}\" khỏi giải đấu này?",
   manualScoreTitle: "Cập nhật tỉ số thủ công",
-  manualScoreSub: "Nhập tỉ số thủ công cho các trận đấu không thể đồng bộ tự động.",
+  manualScoreSub: "Chỉ nhập tỉ số thủ công cho trận đã mở dự đoán, đã kết thúc và provider chưa trả tỉ số.",
   saveBtn: "Lưu",
 
   // Additional Admin page keys
@@ -118,7 +118,7 @@ export const vi = {
   review: "Xem lại",
   matchesNeedingResult: "Trận đấu cần nhập tỷ số",
   inputScore: "Nhập tỷ số",
-  allMatchesScored: "Tất cả các trận đã kết thúc đã được chấm điểm!",
+  allMatchesScored: "Không có trận nào đủ điều kiện cần nhập tỉ số thủ công.",
   stage: "Vòng đấu",
   teamsAndScoreInputs: "Đội bóng & Tỷ số",
   processed: "ĐÃ CHẤM",
@@ -511,6 +511,9 @@ export const vi = {
   errMatchAlreadyStarted: "Trận đã bắt đầu hoặc đã kết thúc.",
   errMatchNotStarted: "Chưa thể nhập tỉ số cho trận chưa bắt đầu.",
   errMatchAlreadyScored: "Trận đã được chấm điểm. Không thể cập nhật tỉ số sau khi đã tính điểm dự đoán.",
+  errMatchStillLive: "Trận vẫn đang trong thời gian thi đấu. Chỉ được nhập tỉ số thủ công sau khi trận kết thúc.",
+  errManualScoreRequiresPredictionMatch: "Chỉ được nhập tỉ số thủ công cho trận đã mở dự đoán.",
+  errManualScoreAlreadyHasResult: "Trận này đã có tỉ số từ provider. Không cần nhập thủ công.",
   errMatchNotLocked: "Chỉ có thể mở khóa trận đang ở trạng thái LOCKED.",
   errMatchPastKickoff: "Trận đã qua thời điểm khóa dự đoán hoặc đã bắt đầu.",
   errPredictionNotAllowed: "Trận đấu không cho phép dự đoán lúc này.",

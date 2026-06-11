@@ -37,6 +37,12 @@ function mapStage(apiStage: string): any {
   }
 }
 
+function getScoreValue(score: any, side: "home" | "away") {
+  const periods = [score?.fullTime, score?.regularTime, score?.halfTime];
+  const period = periods.find((p) => typeof p?.[side] === "number");
+  return period?.[side] ?? null;
+}
+
 export async function fetchWorldCupMatches() {
   const apiKey = env.FOOTBALL_DATA_API_KEY;
   if (!apiKey || apiKey === "your_api_key_here") {
@@ -104,8 +110,8 @@ export async function fetchWorldCupMatches() {
 
         if (!homeTeamRecord || !awayTeamRecord) continue;
 
-        const homeScore = m.score?.fullTime?.home ?? null;
-        const awayScore = m.score?.fullTime?.away ?? null;
+        const homeScore = getScoreValue(m.score, "home");
+        const awayScore = getScoreValue(m.score, "away");
         const newStatus = mapStatus(m.status);
 
         const existingMatch = await prisma.match.findUnique({

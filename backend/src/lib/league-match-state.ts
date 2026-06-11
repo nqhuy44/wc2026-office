@@ -2,6 +2,7 @@ import { env } from "../config/env.js";
 import { prisma } from "./prisma.js";
 
 const TERMINAL_STATUSES = ["SCORED", "FINISHED", "VOID"] as const;
+export const FALLBACK_LIVE_WINDOW_MS = 3 * 60 * 60 * 1000;
 export const PREDICTION_LOCK_SETTING_KEY = "predictionLockMinutes";
 
 function normalizeLockMinutes(value: unknown) {
@@ -48,11 +49,16 @@ export async function refreshLeagueMatchStatuses(leagueId?: string) {
   await Promise.all(
     leagueMatches.map(async (leagueMatch) => {
       let nextStatus = leagueMatch.status;
+      const kickoffAtMs = leagueMatch.match.kickoffAt.getTime();
+      const hasStarted = kickoffAtMs <= now.getTime();
+      const isInFallbackLiveWindow = hasStarted && now.getTime() < kickoffAtMs + FALLBACK_LIVE_WINDOW_MS;
 
       if (TERMINAL_STATUSES.includes(leagueMatch.match.status as any)) {
         nextStatus = leagueMatch.match.status;
-      } else if (leagueMatch.match.status === "LIVE") {
+      } else if (leagueMatch.match.status === "LIVE" || (leagueMatch.isPredictionEnabled && isInFallbackLiveWindow)) {
         nextStatus = "LIVE";
+      } else if (leagueMatch.isPredictionEnabled && hasStarted) {
+        nextStatus = "LOCKED";
       } else if (
         leagueMatch.status === "OPEN" &&
         ((leagueMatch.lockAt && leagueMatch.lockAt <= now) || leagueMatch.match.kickoffAt <= now)

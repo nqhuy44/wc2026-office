@@ -418,19 +418,26 @@ function AdminPageContent() {
   };
 
   const now = Date.now();
-  const needingScoring = matches.filter(
-    (lm) =>
+  const fallbackLiveWindowMs = 3 * 60 * 60 * 1000;
+  const isManualScoreEligible = (lm: LeagueMatch) => {
+    const hasProviderFinalState = ["FINISHED", "SCORED"].includes(lm.match.status);
+    const fallbackEnded = new Date(lm.match.kickoffAt).getTime() + fallbackLiveWindowMs <= now;
+    const hasMissingScore = lm.match.homeScore === null || lm.match.awayScore === null;
+
+    return (
+      lm.isPredictionEnabled &&
+      lm.status !== "LIVE" &&
       lm.status !== "SCORED" &&
       lm.status !== "VOID" &&
-      (new Date(lm.match.kickoffAt).getTime() <= now || lm.status === "FINISHED" || lm.match.homeScore !== null || lm.match.awayScore !== null)
+      hasMissingScore &&
+      (hasProviderFinalState || fallbackEnded)
+    );
+  };
+  const needingScoring = matches.filter(
+    (lm) => isManualScoreEligible(lm)
   );
   const scoreRows = matches.filter(
-    (lm) =>
-      new Date(lm.match.kickoffAt).getTime() <= now ||
-      lm.status === "FINISHED" ||
-      lm.status === "SCORED" ||
-      lm.match.homeScore !== null ||
-      lm.match.awayScore !== null
+    (lm) => isManualScoreEligible(lm)
   );
   const predictionReviewMatches = matches.filter(
     (lm) => lm.isPredictionEnabled && !["SCHEDULED", "VOID"].includes(lm.status)

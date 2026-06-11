@@ -4,6 +4,7 @@ import { prisma } from "../lib/prisma.js";
 import { hashString, generatePasscode } from "../lib/auth-utils.js";
 import { scoreMatch } from "../lib/scoring.js";
 import {
+  FALLBACK_LIVE_WINDOW_MS,
   PREDICTION_LOCK_SETTING_KEY,
   getLeagueLockAt,
   getLeaguePredictionLockMinutes,
@@ -511,12 +512,30 @@ export async function adminRoutes(app: FastifyInstance) {
       return reply.status(404).send({ error: "Not Found", code: "errMatchNotFound" });
     }
 
-    if (leagueMatch.match.kickoffAt > new Date()) {
+    const now = new Date();
+    const hasProviderFinalState = ["FINISHED", "SCORED"].includes(leagueMatch.match.status);
+    const fallbackLiveWindowEndsAt = new Date(leagueMatch.match.kickoffAt.getTime() + FALLBACK_LIVE_WINDOW_MS);
+    const hasFallbackEnded = fallbackLiveWindowEndsAt <= now;
+    const hasMissingScore = leagueMatch.match.homeScore === null || leagueMatch.match.awayScore === null;
+
+    if (!leagueMatch.isPredictionEnabled) {
+      return reply.status(400).send({ error: "Bad Request", code: "errManualScoreRequiresPredictionMatch" });
+    }
+
+    if (leagueMatch.match.kickoffAt > now) {
       return reply.status(400).send({ error: "Bad Request", code: "errMatchNotStarted" });
+    }
+
+    if (leagueMatch.status === "LIVE" || (!hasProviderFinalState && !hasFallbackEnded)) {
+      return reply.status(400).send({ error: "Bad Request", code: "errMatchStillLive" });
     }
 
     if (leagueMatch.match.status === "SCORED") {
       return reply.status(409).send({ error: "Conflict", code: "errMatchAlreadyScored" });
+    }
+
+    if (!hasMissingScore) {
+      return reply.status(409).send({ error: "Conflict", code: "errManualScoreAlreadyHasResult" });
     }
 
     const match = await prisma.match.update({

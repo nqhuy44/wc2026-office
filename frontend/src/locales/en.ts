@@ -98,7 +98,7 @@ export const en = {
   noMembers: "No members in this league yet. Use the form to enroll players!",
   confirmRemove: "Are you sure you want to remove member \"{name}\" from this league?",
   manualScoreTitle: "Manual Score Update",
-  manualScoreSub: "Manually set match scores for custom fixtures.",
+  manualScoreSub: "Only enter manual scores for prediction-enabled matches that have ended and still have no provider score.",
   saveBtn: "Save",
 
   // Additional Admin page keys
@@ -118,7 +118,7 @@ export const en = {
   review: "Review",
   matchesNeedingResult: "Matches Needing Result",
   inputScore: "Input Score",
-  allMatchesScored: "All finished matches have been scored!",
+  allMatchesScored: "No matches are currently eligible for manual score entry.",
   stage: "Stage",
   teamsAndScoreInputs: "Teams & Manual Score Inputs",
   processed: "Processed",
@@ -511,6 +511,9 @@ export const en = {
   errMatchAlreadyStarted: "This match has already started or ended.",
   errMatchNotStarted: "Cannot enter score for a match that hasn't started yet.",
   errMatchAlreadyScored: "This match has already been scored. Cannot update the score after predictions have been calculated.",
+  errMatchStillLive: "This match is still in the live window. Manual score entry is allowed only after it ends.",
+  errManualScoreRequiresPredictionMatch: "Manual score entry is allowed only for matches opened for predictions.",
+  errManualScoreAlreadyHasResult: "This match already has a provider score. Manual entry is not needed.",
   errMatchNotLocked: "Can only unlock a match that is in LOCKED state.",
   errMatchPastKickoff: "Match is past its lock time or has already kicked off.",
   errPredictionNotAllowed: "Predictions are not allowed for this match right now.",
