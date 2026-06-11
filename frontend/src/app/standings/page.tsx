@@ -63,9 +63,9 @@ interface ProviderGroupStanding {
 }
 
 interface ProviderStandingsResponse {
-  source: "provider";
+  source: "provider-db";
   groups: ProviderGroupStanding[];
-  fetchedAt: string;
+  fetchedAt: string | null;
 }
 
 type ViewMode = "groups" | "knockout";
@@ -323,10 +323,6 @@ function scoredMatch(match?: LeagueMatch) {
   return Boolean(match && match.match.homeScore !== null && match.match.awayScore !== null);
 }
 
-function hasOfficialGroupFixtures(matches: LeagueMatch[], group: string) {
-  return matches.some((lm) => lm.match.stage === "GROUP" && lm.match.groupName === group && lm.match.externalMatchId);
-}
-
 function getWinner(match: ResolvedKnockoutMatch): ResolvedEntrant | undefined {
   if (match.homeScore === null || match.awayScore === null || match.homeScore === match.awayScore) return undefined;
   return match.homeScore > match.awayScore ? match.home : match.away;
@@ -391,68 +387,9 @@ export default function StandingsPage() {
     return sortGroups(Array.from(new Set([...WORLD_CUP_GROUPS, ...fromData, ...Object.keys(providerStandings)])));
   }, [matches, providerStandings]);
 
-  const computeGroup = (group: string): GroupTeamStats[] => {
-    const statsByTeam: Record<string, GroupTeamStats> = {};
-    const shouldUseOfficialOnly = hasOfficialGroupFixtures(matches, group);
-    matches
-      .filter(
-        (lm) =>
-          lm.match.stage === "GROUP" &&
-          lm.match.groupName === group &&
-          (!shouldUseOfficialOnly || Boolean(lm.match.externalMatchId))
-      )
-      .forEach((lm) => {
-        const { homeTeam, awayTeam, homeScore, awayScore } = lm.match;
-
-        if (!statsByTeam[homeTeam.id]) {
-          statsByTeam[homeTeam.id] = { team: homeTeam, group, mp: 0, w: 0, d: 0, l: 0, gf: 0, ga: 0, gd: 0, pts: 0 };
-        }
-        if (!statsByTeam[awayTeam.id]) {
-          statsByTeam[awayTeam.id] = { team: awayTeam, group, mp: 0, w: 0, d: 0, l: 0, gf: 0, ga: 0, gd: 0, pts: 0 };
-        }
-
-        if (homeScore === null || awayScore === null) return;
-
-        const home = statsByTeam[homeTeam.id];
-        const away = statsByTeam[awayTeam.id];
-
-        home.mp += 1;
-        away.mp += 1;
-        home.gf += homeScore;
-        home.ga += awayScore;
-        away.gf += awayScore;
-        away.ga += homeScore;
-
-        if (homeScore > awayScore) {
-          home.w += 1;
-          home.pts += 3;
-          away.l += 1;
-        } else if (homeScore < awayScore) {
-          away.w += 1;
-          away.pts += 3;
-          home.l += 1;
-        } else {
-          home.d += 1;
-          away.d += 1;
-          home.pts += 1;
-          away.pts += 1;
-        }
-
-        home.gd = home.gf - home.ga;
-        away.gd = away.gf - away.ga;
-      });
-
-    return Object.values(statsByTeam).sort((a, b) => {
-      if (b.pts !== a.pts) return b.pts - a.pts;
-      if (b.gd !== a.gd) return b.gd - a.gd;
-      if (b.gf !== a.gf) return b.gf - a.gf;
-      return a.team.name.localeCompare(b.team.name);
-    });
-  };
-
   const groupStandings = useMemo(() => {
-    return Object.fromEntries(groups.map((group) => [group, providerStandings[group] ?? computeGroup(group)]));
-  }, [groups, matches, providerStandings]);
+    return Object.fromEntries(groups.map((group) => [group, providerStandings[group] ?? []]));
+  }, [groups, providerStandings]);
 
   const knockoutByRound = useMemo(() => {
     const actualMatchesByStage = KNOCKOUT_ROUNDS.reduce<Record<string, LeagueMatch[]>>((acc, round) => {
@@ -467,18 +404,7 @@ export default function StandingsPage() {
 
     const groupIsComplete = (group: string) => {
       const providerRows = providerStandings[group];
-      if (providerRows) {
-        return providerRows.length === 4 && providerRows.every((row) => row.mp >= 3);
-      }
-
-      const shouldUseOfficialOnly = hasOfficialGroupFixtures(matches, group);
-      const groupMatches = matches.filter(
-        (lm) =>
-          lm.match.stage === "GROUP" &&
-          lm.match.groupName === group &&
-          (!shouldUseOfficialOnly || Boolean(lm.match.externalMatchId))
-      );
-      return groupMatches.length === 6 && groupMatches.every((lm) => scoredMatch(lm)) && (groupStandings[group]?.length ?? 0) === 4;
+      return Boolean(providerRows && providerRows.length === 4 && providerRows.every((row) => row.mp >= 3));
     };
 
     const resolveEntrant = (ref: EntrantRef, actualTeam?: Team): ResolvedEntrant => {
@@ -615,17 +541,9 @@ export default function StandingsPage() {
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
             {groups.map((group) => {
               const rows = groupStandings[group] ?? [];
-              const shouldUseOfficialOnly = hasOfficialGroupFixtures(matches, group);
               const playedMatches = providerStandings[group]
                 ? Math.floor(providerStandings[group].reduce((total, row) => total + row.mp, 0) / 2)
-                : matches.filter(
-                    (lm) =>
-                      lm.match.stage === "GROUP" &&
-                      lm.match.groupName === group &&
-                      (!shouldUseOfficialOnly || Boolean(lm.match.externalMatchId)) &&
-                      lm.match.homeScore !== null &&
-                      lm.match.awayScore !== null
-                  ).length;
+                : 0;
 
               return (
                 <article key={group} className="kp-card" style={{ padding: 0, overflow: "hidden" }}>

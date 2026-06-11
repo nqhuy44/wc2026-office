@@ -3,6 +3,7 @@ import { prisma } from "./prisma.js";
 import { scoreMatch } from "./scoring.js";
 
 const API_BASE = "https://api.football-data.org/v4";
+const WORLD_CUP_COMPETITION_CODE = "WC";
 
 export interface ProviderStandingRow {
   position: number;
@@ -233,4 +234,114 @@ export async function fetchWorldCupStandings(): Promise<ProviderGroupStanding[]>
       } satisfies ProviderGroupStanding;
     })
     .filter((standing: ProviderGroupStanding | null): standing is ProviderGroupStanding => Boolean(standing));
+}
+
+export async function syncWorldCupStandings() {
+  const groups = await fetchWorldCupStandings();
+  const fetchedAt = new Date();
+
+  await prisma.$transaction(async (tx) => {
+    await tx.providerStanding.deleteMany({
+      where: {
+        competitionCode: WORLD_CUP_COMPETITION_CODE
+      }
+    });
+
+    for (const group of groups) {
+      for (const row of group.rows) {
+        let teamRecord = null;
+
+        if (row.team.id) {
+          teamRecord = await tx.team.upsert({
+            where: { externalTeamId: row.team.id },
+            update: {
+              name: row.team.name,
+              shortName: row.team.shortName,
+              countryCode: row.team.countryCode,
+              flagUrl: row.team.flagUrl
+            },
+            create: {
+              externalTeamId: row.team.id,
+              name: row.team.name,
+              shortName: row.team.shortName,
+              countryCode: row.team.countryCode,
+              flagUrl: row.team.flagUrl
+            }
+          });
+        }
+
+        await tx.providerStanding.create({
+          data: {
+            competitionCode: WORLD_CUP_COMPETITION_CODE,
+            group: group.group,
+            position: row.position,
+            teamExternalId: row.team.id,
+            teamId: teamRecord?.id ?? null,
+            teamName: row.team.name,
+            shortName: row.team.shortName,
+            countryCode: row.team.countryCode,
+            flagUrl: row.team.flagUrl,
+            playedGames: row.playedGames,
+            won: row.won,
+            draw: row.draw,
+            lost: row.lost,
+            goalsFor: row.goalsFor,
+            goalsAgainst: row.goalsAgainst,
+            goalDifference: row.goalDifference,
+            points: row.points,
+            fetchedAt
+          }
+        });
+      }
+    }
+  });
+
+  return { groups, fetchedAt };
+}
+
+export async function getStoredWorldCupStandings(): Promise<{ groups: ProviderGroupStanding[]; fetchedAt: Date | null }> {
+  const rows = await prisma.providerStanding.findMany({
+    where: {
+      competitionCode: WORLD_CUP_COMPETITION_CODE
+    },
+    orderBy: [
+      { group: "asc" },
+      { position: "asc" }
+    ]
+  });
+
+  const grouped = new Map<string, ProviderStandingRow[]>();
+  let fetchedAt: Date | null = null;
+
+  for (const row of rows) {
+    if (!fetchedAt || row.fetchedAt > fetchedAt) fetchedAt = row.fetchedAt;
+    const groupRows = grouped.get(row.group) ?? [];
+    groupRows.push({
+      position: row.position,
+      team: {
+        id: row.teamExternalId,
+        name: row.teamName,
+        shortName: row.shortName,
+        countryCode: row.countryCode,
+        flagUrl: row.flagUrl
+      },
+      playedGames: row.playedGames,
+      won: row.won,
+      draw: row.draw,
+      lost: row.lost,
+      goalsFor: row.goalsFor,
+      goalsAgainst: row.goalsAgainst,
+      goalDifference: row.goalDifference,
+      points: row.points
+    });
+    grouped.set(row.group, groupRows);
+  }
+
+  return {
+    groups: Array.from(grouped.entries()).map(([group, groupRows]) => ({
+      group,
+      rows: groupRows
+    })),
+    fetchedAt
+  };
 }

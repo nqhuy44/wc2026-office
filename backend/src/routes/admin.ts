@@ -661,11 +661,8 @@ export async function adminRoutes(app: FastifyInstance) {
   app.post("/admin/sync-matches", { preHandler: [app.requireAdmin] }, async (request) => {
     const leagueId = request.leagueMember!.leagueId;
 
-    // Step 1: Sync global matches from Football-Data.org
-    const { fetchWorldCupMatches } = await import("../lib/football-api.js");
-    await fetchWorldCupMatches();
-
-    // Step 2: Auto-create LeagueMatch records for this league
+    // Provider sync runs from backend cron. This action only attaches stored
+    // global fixtures to the current league, so admin clicks cannot hit rate limits.
     const allGlobalMatches = await prisma.match.findMany({
       select: { id: true }
     });
@@ -692,7 +689,7 @@ export async function adminRoutes(app: FastifyInstance) {
 
     return {
       ok: true,
-      message: `Đồng bộ thành công! ${newMatches.length} trận mới được thêm vào giải đấu.`
+      message: `Đồng bộ thành công từ dữ liệu backend! ${newMatches.length} trận mới được thêm vào giải đấu.`
     };
   });
 }

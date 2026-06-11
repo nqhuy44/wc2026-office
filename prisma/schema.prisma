@@ -164,6 +164,7 @@ model Team {
   awayMatches     Match[]   @relation("AwayTeam")
   championLeagues League[]  @relation("LeagueChampion")
   championPicks   ChampionPick[]
+  providerStandings ProviderStanding[]
 
   @@index([name])
 }
@@ -261,6 +262,36 @@ model ChampionPick {
 
   @@unique([leagueId, memberId])
   @@index([leagueId])
+}
+
+model ProviderStanding {
+  id              String   @id @default(cuid())
+  competitionCode String
+  group           String
+  position        Int
+  teamExternalId  String
+  teamId          String?
+  teamName        String
+  shortName       String?
+  countryCode     String?
+  flagUrl         String?
+  playedGames     Int
+  won             Int
+  draw            Int
+  lost            Int
+  goalsFor        Int
+  goalsAgainst    Int
+  goalDifference  Int
+  points          Int
+  fetchedAt       DateTime
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  team            Team?    @relation(fields: [teamId], references: [id], onDelete: SetNull)
+
+  @@unique([competitionCode, group, teamExternalId])
+  @@index([competitionCode, group, position])
+  @@index([teamId])
 }
 
 model AuditLog {
