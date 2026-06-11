@@ -591,7 +591,6 @@ export const en = {
   adminChampionPickLockAt: "Lock time",
   adminChampionPickLockSave: "Save lock time",
   adminChampionPickLockNow: "Lock now",
-  adminChampionPickReopenAfterGroups: "Reopen after groups",
   adminChampionPickLockSaved: "Champion pick lock time updated.",
   adminChampionNone: "Not confirmed",
   adminChampionSave: "Confirm champion",

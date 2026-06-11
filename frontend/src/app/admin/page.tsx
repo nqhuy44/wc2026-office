@@ -1447,18 +1447,6 @@ function AdminPageContent() {
                     >
                       {t("adminChampionPickLockNow")}
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const nextLock = "2026-06-27T00:00";
-                        setChampionPickLockAt(nextLock);
-                        handleSaveChampionPickLock(nextLock);
-                      }}
-                      disabled={championPickLockSaving}
-                      className="min-h-[38px] px-4 py-2 rounded border border-blue-200 bg-blue-50 text-blue-700 text-[13px] font-extrabold disabled:opacity-50"
-                    >
-                      {t("adminChampionPickReopenAfterGroups")}
-                    </button>
                   </div>
                 </div>
                 <div className={`mt-3 inline-flex items-center px-2.5 py-0.5 rounded-full border text-[11px] font-extrabold uppercase ${

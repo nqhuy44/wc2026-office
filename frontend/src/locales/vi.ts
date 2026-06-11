@@ -591,7 +591,6 @@ export const vi = {
   adminChampionPickLockAt: "Thời điểm khóa",
   adminChampionPickLockSave: "Lưu thời điểm khóa",
   adminChampionPickLockNow: "Khóa ngay",
-  adminChampionPickReopenAfterGroups: "Mở lại sau vòng bảng",
   adminChampionPickLockSaved: "Đã cập nhật thời điểm khóa dự đoán đội vô địch.",
   adminChampionNone: "Chưa xác nhận",
   adminChampionSave: "Xác nhận vô địch",
