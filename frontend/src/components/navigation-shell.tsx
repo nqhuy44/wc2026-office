@@ -169,6 +169,7 @@ function NavigationShellContent({ children }: { children: React.ReactNode }) {
     { name: t("adminDashboard"), href: "/admin?tab=dashboard", tab: "dashboard", icon: ShieldAlert },
     { name: t("players"), href: "/admin?tab=players", tab: "players", icon: Users },
     { name: t("matches"), href: "/admin?tab=matches", tab: "matches", icon: Calendar },
+    { name: t("adminPredictions"), href: "/admin?tab=predictions", tab: "predictions", icon: Target },
     { name: t("settings"), href: "/admin?tab=settings", tab: "settings", icon: Settings },
   ];
 

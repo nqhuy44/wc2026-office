@@ -14,6 +14,10 @@ const addMemberSchema = z.object({
   role: z.enum(["PLAYER", "ADMIN"]).default("PLAYER"),
 });
 
+const updateMemberRoleSchema = z.object({
+  role: z.enum(["PLAYER", "ADMIN"])
+});
+
 export async function superAdminRoutes(app: FastifyInstance) {
   // ─── League Management ───
 
@@ -147,8 +151,58 @@ export async function superAdminRoutes(app: FastifyInstance) {
       return reply.status(403).send({ error: "Forbidden", code: "errCannotRemoveSuperAdmin" });
     }
 
+    if (member.role === "ADMIN") {
+      const adminCount = await prisma.leagueMember.count({
+        where: { leagueId: member.leagueId, role: "ADMIN" }
+      });
+      if (adminCount <= 1) {
+        return reply.status(400).send({ error: "Bad Request", code: "errCannotRemoveLastLeagueAdmin" });
+      }
+    }
+
     await prisma.leagueMember.delete({ where: { id: memberId } });
     return { ok: true, message: `Đã xóa ${member.nickname} khỏi giải đấu.` };
+  });
+
+  app.put("/superadmin/participants/:memberId/role", { preHandler: [app.requireSuperAdmin] }, async (request, reply) => {
+    const { memberId } = request.params as { memberId: string };
+    const { role } = updateMemberRoleSchema.parse(request.body);
+
+    const member = await prisma.leagueMember.findUnique({
+      where: { id: memberId },
+      include: { user: true }
+    });
+
+    if (!member) {
+      return reply.status(404).send({ error: "Not Found", code: "errMemberNotFound" });
+    }
+
+    if (member.role === "ADMIN" && role !== "ADMIN") {
+      const adminCount = await prisma.leagueMember.count({
+        where: { leagueId: member.leagueId, role: "ADMIN" }
+      });
+      if (adminCount <= 1) {
+        return reply.status(400).send({ error: "Bad Request", code: "errCannotDemoteLastLeagueAdmin" });
+      }
+    }
+
+    const updated = await prisma.leagueMember.update({
+      where: { id: memberId },
+      data: { role },
+      include: { user: true }
+    });
+
+    return {
+      participant: {
+        id: updated.id,
+        nickname: updated.nickname,
+        role: updated.role,
+        contributionStatus: updated.contributionStatus,
+        username: updated.user.username,
+        displayName: updated.user.displayName
+      },
+      message: `Đã cập nhật vai trò của ${updated.nickname} thành ${updated.role}`
+    };
   });
 
   app.post("/superadmin/participants/:memberId/reset-passcode", { preHandler: [app.requireSuperAdmin] }, async (request, reply) => {

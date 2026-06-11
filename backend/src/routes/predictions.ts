@@ -63,31 +63,6 @@ export async function predictionRoutes(app: FastifyInstance) {
   });
 
   app.get("/matches/:leagueMatchId/predictions", { preHandler: [app.requireLeagueMember] }, async (request, reply) => {
-    const { leagueMatchId } = request.params as { leagueMatchId: string };
-
-    const leagueMatch = await prisma.leagueMatch.findUnique({
-      where: { id: leagueMatchId }
-    });
-
-    if (!leagueMatch || leagueMatch.leagueId !== request.leagueMember!.leagueId) {
-      return reply.status(404).send({ error: "Not Found", code: "errMatchNotFound" });
-    }
-
-    // Only reveal other people's predictions if match is LOCKED or later
-    if (leagueMatch.status === "SCHEDULED" || leagueMatch.status === "OPEN") {
-      return { predictions: [] };
-    }
-
-    const predictions = await prisma.prediction.findMany({
-      where: { leagueMatchId },
-      include: {
-        member: {
-          select: { id: true, nickname: true }
-        }
-      },
-      orderBy: { points: 'desc' }
-    });
-
-    return { predictions };
+    return reply.status(410).send({ error: "Gone", code: "errLegacyPredictionsRouteDisabled" });
   });
 }

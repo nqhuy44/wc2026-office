@@ -14,18 +14,12 @@ interface LeagueMatch {
   id: string; status: string; isPredictionEnabled: boolean; lockAt: string; match: Match;
   myPrediction: { homeScorePred: number; awayScorePred: number; points: number; resultType: string; } | null;
 }
-interface PeerPrediction {
-  id: string; homeScorePred: number; awayScorePred: number; points: number; resultType: string;
-  participant: { nickname: string; };
-}
-
 export default function MatchDetailPage() {
   const params = useParams();
   const leagueMatchId = params.id as string;
   const { language, t } = useLanguage();
 
   const [lm, setLm] = useState<LeagueMatch | null>(null);
-  const [peers, setPeers] = useState<PeerPrediction[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Prediction form
@@ -45,15 +39,6 @@ export default function MatchDetailPage() {
           if (found.myPrediction) {
             setHomeScore(found.myPrediction.homeScorePred);
             setAwayScore(found.myPrediction.awayScorePred);
-          }
-          // Load peer predictions only after the prediction window is closed for active matches.
-          if (found.isPredictionEnabled && !["OPEN", "SCHEDULED"].includes(found.status)) {
-            try {
-              const peerData = await apiClient<{ predictions: PeerPrediction[] }>(`/matches/${leagueMatchId}/predictions`);
-              setPeers(peerData.predictions);
-            } catch (err) {
-              console.error("Failed to load peer predictions:", err);
-            }
           }
         }
       } catch (err) {
@@ -215,48 +200,6 @@ export default function MatchDetailPage() {
               </div>
             )}
 
-            {/* All predictions table (scored) */}
-            {peers.length > 0 && (
-              <div className="kp-card mb-6">
-                <div className="text-[16px] font-bold text-foreground mb-1">
-                  {t("participantPredictionsTitle")}
-                </div>
-                <div className="text-[13px] text-muted-foreground mb-4">
-                  {t("peerCountLabel").replace("{count}", peers.length.toString())}
-                </div>
-                <table className="kp-table">
-                  <thead>
-                    <tr>
-                      <th>{t("nicknameCol")}</th>
-                      <th>{t("theirPickCol")}</th>
-                      <th>{t("resultCol")}</th>
-                      <th style={{ textAlign: 'right' }}>{t("pointsCol")}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {peers.map((p) => (
-                      <tr key={p.id}>
-                        <td className="font-semibold">{p.participant.nickname}</td>
-                        <td className="font-bold">{p.homeScorePred} – {p.awayScorePred}</td>
-                        <td>
-                          <span className={`text-[13px] font-bold ${p.resultType === 'EXACT_SCORE' ? 'text-success' : p.resultType === 'CORRECT_RESULT' ? 'text-blue-dark' : 'text-muted-foreground'}`}>
-                            {p.resultType === 'EXACT_SCORE' 
-                              ? t("exactPeerBadge") 
-                              : p.resultType === 'CORRECT_RESULT' 
-                                ? t("correctPeerBadge") 
-                                : t("wrongPeerBadge")
-                            }
-                          </span>
-                        </td>
-                        <td style={{ textAlign: 'right' }} className={`font-bold ${p.resultType === 'EXACT_SCORE' ? 'text-success' : p.resultType === 'CORRECT_RESULT' ? 'text-blue-dark' : 'text-muted-foreground'}`}>
-                          +{p.points} {t("pointsWord")}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
           </>
         ) : (
           /* ─── OPEN State ─── */
@@ -355,50 +298,6 @@ export default function MatchDetailPage() {
               </div>
             )}
 
-            {/* Locked state: show peer predictions */}
-            {!isOpen && peers.length > 0 && (
-              <div className="kp-card mb-5" style={{ borderRadius: '12px', padding: '24px 28px' }}>
-                <div className="text-[16px] font-bold text-foreground mb-1">
-                  {t("participantPredictionsTitle")}
-                </div>
-                <div className="text-[13px] text-muted-foreground mb-4">
-                  {t("peerCountOpenLabel").replace("{count}", peers.length.toString())}
-                </div>
-                <table className="kp-table">
-                  <thead>
-                    <tr>
-                      <th>{t("nicknameCol")}</th>
-                      <th>{t("theirPickCol")}</th>
-                      <th>{t("statusCol")}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {peers.map((p) => (
-                      <tr key={p.id}>
-                        <td className="font-semibold">{p.participant.nickname}</td>
-                        <td className="font-bold">{p.homeScorePred} – {p.awayScorePred}</td>
-                        <td>
-                          {p.resultType === 'PENDING' ? (
-                            <span className="text-muted-foreground text-[13px]">
-                              {t("pendingStatus")}
-                            </span>
-                          ) : (
-                            <span className={`text-[13px] font-bold ${p.resultType === 'EXACT_SCORE' ? 'text-success' : p.resultType === 'CORRECT_RESULT' ? 'text-blue-dark' : 'text-muted-foreground'}`}>
-                              {p.resultType === 'EXACT_SCORE' 
-                                ? t("exactPeerBadge") 
-                                : p.resultType === 'CORRECT_RESULT' 
-                                  ? t("correctPeerBadge") 
-                                  : t("wrongPeerBadge")
-                              }
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
           </>
         )}
       </div>

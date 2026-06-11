@@ -17,6 +17,10 @@ const addMemberSchema = z.object({
   role: z.enum(["PLAYER", "ADMIN"]).default("PLAYER")
 });
 
+const updateMemberRoleSchema = z.object({
+  role: z.enum(["PLAYER", "ADMIN"])
+});
+
 const updateScoreSchema = z.object({
   homeScore: z.number().min(0),
   awayScore: z.number().min(0),
@@ -138,6 +142,52 @@ export async function adminRoutes(app: FastifyInstance) {
     };
   });
 
+  app.put("/admin/participants/:memberId/role", { preHandler: [app.requireAdmin] }, async (request, reply) => {
+    const { memberId } = request.params as { memberId: string };
+    const { role } = updateMemberRoleSchema.parse(request.body);
+    const leagueId = request.leagueMember!.leagueId;
+
+    const member = await prisma.leagueMember.findFirst({
+      where: { id: memberId, leagueId },
+      include: { user: true }
+    });
+
+    if (!member) {
+      return reply.status(404).send({ error: "Not Found", code: "errMemberNotFound" });
+    }
+
+    if (member.id === request.leagueMember!.id && role !== "ADMIN") {
+      return reply.status(400).send({ error: "Bad Request", code: "errCannotChangeOwnLeagueRole" });
+    }
+
+    if (member.role === "ADMIN" && role !== "ADMIN") {
+      const adminCount = await prisma.leagueMember.count({
+        where: { leagueId, role: "ADMIN" }
+      });
+      if (adminCount <= 1) {
+        return reply.status(400).send({ error: "Bad Request", code: "errCannotDemoteLastLeagueAdmin" });
+      }
+    }
+
+    const updated = await prisma.leagueMember.update({
+      where: { id: memberId },
+      data: { role },
+      include: { user: true }
+    });
+
+    return {
+      participant: {
+        id: updated.id,
+        nickname: updated.nickname,
+        role: updated.role,
+        contributionStatus: updated.contributionStatus,
+        username: updated.user.username,
+        displayName: updated.user.displayName
+      },
+      message: `Đã cập nhật vai trò của ${updated.nickname} thành ${updated.role}`
+    };
+  });
+
   // Remove member from League
   app.delete("/admin/participants/:memberId", { preHandler: [app.requireAdmin] }, async (request, reply) => {
     const { memberId } = request.params as { memberId: string };
@@ -149,6 +199,15 @@ export async function adminRoutes(app: FastifyInstance) {
 
     if (!member) {
       return reply.status(404).send({ error: "Not Found", code: "errMemberNotFound" });
+    }
+
+    if (member.role === "ADMIN") {
+      const adminCount = await prisma.leagueMember.count({
+        where: { leagueId, role: "ADMIN" }
+      });
+      if (adminCount <= 1) {
+        return reply.status(400).send({ error: "Bad Request", code: "errCannotRemoveLastLeagueAdmin" });
+      }
     }
 
     await prisma.leagueMember.delete({
@@ -187,6 +246,78 @@ export async function adminRoutes(app: FastifyInstance) {
       nickname: member.nickname,
       passcode: newPasscode,
       message: `Đã reset mật khẩu cho ${member.nickname} thành: ${newPasscode}`
+    };
+  });
+
+  app.get("/admin/matches/:leagueMatchId/predictions", { preHandler: [app.requireAdmin] }, async (request, reply) => {
+    const { leagueMatchId } = request.params as { leagueMatchId: string };
+    const leagueId = request.leagueMember!.leagueId;
+
+    await refreshLeagueMatchStatuses(leagueId);
+
+    const leagueMatch = await prisma.leagueMatch.findFirst({
+      where: {
+        id: leagueMatchId,
+        leagueId
+      },
+      include: {
+        match: {
+          include: {
+            homeTeam: true,
+            awayTeam: true
+          }
+        }
+      }
+    });
+
+    if (!leagueMatch) {
+      return reply.status(404).send({ error: "Not Found", code: "errMatchNotFound" });
+    }
+
+    if (!leagueMatch.isPredictionEnabled || ["SCHEDULED", "VOID"].includes(leagueMatch.status)) {
+      return reply.status(400).send({ error: "Bad Request", code: "errMatchNotOpenForPredictions" });
+    }
+
+    const predictions = await prisma.prediction.findMany({
+      where: {
+        leagueMatchId,
+        resultType: { not: "VOID" }
+      },
+      include: {
+        member: {
+          include: {
+            user: {
+              select: {
+                username: true,
+                displayName: true
+              }
+            }
+          }
+        }
+      },
+      orderBy: [
+        { points: "desc" },
+        { updatedAt: "asc" }
+      ]
+    });
+
+    return {
+      leagueMatch,
+      predictions: predictions.map((prediction) => ({
+        id: prediction.id,
+        homeScorePred: prediction.homeScorePred,
+        awayScorePred: prediction.awayScorePred,
+        points: prediction.points,
+        resultType: prediction.resultType,
+        createdAt: prediction.createdAt,
+        updatedAt: prediction.updatedAt,
+        member: {
+          id: prediction.member.id,
+          nickname: prediction.member.nickname,
+          username: prediction.member.user.username,
+          displayName: prediction.member.user.displayName
+        }
+      }))
     };
   });
 

@@ -21,7 +21,8 @@ import {
   ToggleRight,
   Lock,
   Calendar,
-  Search
+  Search,
+  Eye
 } from "lucide-react";
 
 interface Participant {
@@ -70,6 +71,22 @@ interface TeamSimple {
   name: string;
   shortName: string | null;
   flagUrl: string | null;
+}
+
+interface AdminPrediction {
+  id: string;
+  homeScorePred: number;
+  awayScorePred: number;
+  points: number;
+  resultType: string;
+  createdAt: string;
+  updatedAt: string;
+  member: {
+    id: string;
+    nickname: string;
+    username: string;
+    displayName: string;
+  };
 }
 
 const TEAM_FLAG_FALLBACK: Record<string, string> = {
@@ -166,6 +183,9 @@ function AdminPageContent() {
   const [championTeam, setChampionTeam] = useState<TeamSimple | null>(null);
   const [championTeamId, setChampionTeamId] = useState<string>("");
   const [championSaving, setChampionSaving] = useState(false);
+  const [selectedPredictionMatch, setSelectedPredictionMatch] = useState<LeagueMatch | null>(null);
+  const [adminPredictions, setAdminPredictions] = useState<AdminPrediction[]>([]);
+  const [loadingAdminPredictions, setLoadingAdminPredictions] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -252,6 +272,23 @@ function AdminPageContent() {
         { method: "PUT" }
       );
       setParticipants(prev => prev.map(p => p.id === memberId ? { ...p, contributionStatus: data.participant.contributionStatus } : p));
+    } catch (err: any) {
+      alert(err.code ? t(err.code as any) : t("errUnknown"));
+    }
+  };
+
+  const handleChangeMemberRole = async (member: Participant) => {
+    const nextRole = member.role === "ADMIN" ? "PLAYER" : "ADMIN";
+    const confirmKey = nextRole === "ADMIN" ? "promoteToLeagueAdminConfirm" : "demoteFromLeagueAdminConfirm";
+    if (!confirm(t(confirmKey as any).replace("{name}", member.nickname))) return;
+
+    try {
+      const data = await apiClient<{ participant: Participant; message: string }>(`/admin/participants/${member.id}/role`, {
+        method: "PUT",
+        json: { role: nextRole }
+      });
+      setParticipants((prev) => prev.map((p) => p.id === member.id ? { ...p, role: data.participant.role } : p));
+      alert(t("leagueRoleChangedAlert").replace("{name}", member.nickname).replace("{role}", data.participant.role));
     } catch (err: any) {
       alert(err.code ? t(err.code as any) : t("errUnknown"));
     }
@@ -347,6 +384,28 @@ function AdminPageContent() {
     }
   };
 
+  const handleOpenAdminPredictions = async (leagueMatch: LeagueMatch) => {
+    setSelectedPredictionMatch(leagueMatch);
+    setLoadingAdminPredictions(true);
+    setAdminPredictions([]);
+    try {
+      const data = await apiClient<{ predictions: AdminPrediction[] }>(`/admin/matches/${leagueMatch.id}/predictions`);
+      setAdminPredictions(data.predictions);
+    } catch (err: any) {
+      alert(err.code ? t(err.code as any) : t("errUnknown"));
+      setSelectedPredictionMatch(null);
+    } finally {
+      setLoadingAdminPredictions(false);
+    }
+  };
+
+  const resultBadgeText = (resultType: string) => {
+    if (resultType === "EXACT_SCORE") return t("exactPeerBadge");
+    if (resultType === "CORRECT_RESULT") return t("correctPeerBadge");
+    if (resultType === "WRONG") return t("wrongPeerBadge");
+    return t("pendingStatus");
+  };
+
   const now = Date.now();
   const needingScoring = matches.filter(
     (lm) =>
@@ -361,6 +420,9 @@ function AdminPageContent() {
       lm.status === "SCORED" ||
       lm.match.homeScore !== null ||
       lm.match.awayScore !== null
+  );
+  const predictionReviewMatches = matches.filter(
+    (lm) => lm.isPredictionEnabled && !["SCHEDULED", "VOID"].includes(lm.status)
   );
 
   if (loading) {
@@ -585,6 +647,12 @@ function AdminPageContent() {
                         </td>
                         <td className="px-6 py-4 text-right pr-8">
                           <div className="inline-flex items-center gap-2 justify-end">
+                            <button
+                              onClick={() => handleChangeMemberRole(p)}
+                              className="text-xs font-bold text-emerald-700 hover:text-emerald-900 transition-colors py-1 px-2 hover:bg-emerald-50 rounded"
+                            >
+                              {p.role === "ADMIN" ? t("demoteLeagueAdminBtn") : t("promoteLeagueAdminBtn")}
+                            </button>
                             <button
                               onClick={() => handleResetPasscode(p.id, p.nickname)}
                               className="text-xs font-bold text-amber-600 hover:text-amber-800 transition-colors py-1 px-2 hover:bg-amber-50 rounded"
@@ -928,6 +996,165 @@ function AdminPageContent() {
                 </div>
               )}
             </article>
+          </div>
+        )}
+
+        {activeTab === "predictions" && (
+          <div className="space-y-6">
+            <article className="bg-card border border-border rounded-lg shadow-[0_12px_30px_rgba(31,41,55,0.08)] overflow-hidden bg-white">
+              <div className="p-6 border-b border-border bg-[linear-gradient(180deg,rgba(47,125,92,0.02),transparent)]">
+                <h3 className="text-[17px] font-bold text-foreground mb-1 flex items-center gap-1.5">
+                  <Eye size={18} className="text-primary-strong" style={{ color: '#2F7D5C' }} />
+                  {t("adminPredictionsTitle")}
+                </h3>
+                <p className="text-muted-foreground text-[13px] mt-0.5">
+                  {t("adminPredictionsSub")}
+                </p>
+              </div>
+
+              {predictionReviewMatches.length === 0 ? (
+                <p className="text-center text-[13px] text-muted-foreground py-12">
+                  {t("noAdminPredictionMatches")}
+                </p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-[13px]">
+                    <thead>
+                      <tr className="border-b border-border bg-muted/65 text-muted-foreground font-extrabold uppercase tracking-wider text-[11px] bg-gray-50">
+                        <th className="px-6 py-4">{t("stage")}</th>
+                        <th className="px-6 py-4">{t("matchInfo")}</th>
+                        <th className="px-6 py-4 text-center">{t("kickoff")}</th>
+                        <th className="px-6 py-4 text-center">{t("predictionStatus")}</th>
+                        <th className="px-6 py-4 text-right pr-8">{t("colActions")}</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {predictionReviewMatches.map((lm) => {
+                        const kickoff = new Date(lm.match.kickoffAt);
+                        return (
+                          <tr key={lm.id} className="hover:bg-[#fcfbf7] transition-all">
+                            <td className="px-6 py-4 text-muted-foreground font-semibold text-[11px] uppercase tracking-wider">
+                              {stageLabel(lm.match.stage, lm.match.groupName)}
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="grid grid-cols-[28px_minmax(0,1fr)_28px_minmax(0,1fr)] items-center gap-2 min-w-[420px]">
+                                <TeamLogo team={lm.match.homeTeam} />
+                                <span className="font-bold text-foreground truncate">{lm.match.homeTeam.name}</span>
+                                <TeamLogo team={lm.match.awayTeam} />
+                                <span className="font-bold text-foreground truncate">{lm.match.awayTeam.name}</span>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 text-center">
+                              <div className="text-[12px] font-medium text-foreground">
+                                {kickoff.toLocaleDateString(language === "vi" ? "vi-VN" : "en-US", { day: "2-digit", month: "2-digit" })}
+                              </div>
+                              <div className="text-[11px] text-muted-foreground">
+                                {kickoff.toLocaleTimeString(language === "vi" ? "vi-VN" : "en-US", { hour: "2-digit", minute: "2-digit" })}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 text-center">
+                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full border text-[11px] font-extrabold uppercase ${
+                                lm.status === "OPEN"
+                                  ? "border-green-200 bg-green-50 text-green-700"
+                                  : lm.status === "LOCKED"
+                                    ? "border-amber-200 bg-amber-50 text-amber-700"
+                                    : "border-gray-200 bg-gray-50 text-gray-600"
+                              }`}>
+                                {lm.status === "OPEN" ? t("predictionOpen") : lm.status}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-right pr-8">
+                              <button
+                                onClick={() => handleOpenAdminPredictions(lm)}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-bold border border-border bg-white text-foreground hover:bg-gray-50 transition-all"
+                              >
+                                <Eye size={13} />
+                                {t("viewPredictions")}
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </article>
+
+            {selectedPredictionMatch && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/20 backdrop-blur-[2px]">
+                <div className="w-full max-w-[720px] bg-white border border-border rounded-lg p-6 shadow-[0_24px_50px_rgba(31,41,55,0.16)] flex flex-col max-h-[90vh]">
+                  <div className="flex items-start justify-between border-b border-border pb-3 mb-4 gap-4">
+                    <div>
+                      <h3 className="text-[17px] font-bold text-foreground">
+                        {t("adminPredictionModalTitle")}
+                      </h3>
+                      <p className="text-muted-foreground text-[13px] mt-0.5">
+                        {selectedPredictionMatch.match.homeTeam.name} vs {selectedPredictionMatch.match.awayTeam.name}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setSelectedPredictionMatch(null)}
+                      className="min-h-[36px] px-3 py-1.5 border border-border rounded font-extrabold hover:bg-gray-50 text-[13px]"
+                    >
+                      {t("closeModalAction")}
+                    </button>
+                  </div>
+
+                  {loadingAdminPredictions ? (
+                    <div className="flex justify-center py-12">
+                      <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" style={{ borderColor: '#2F7D5C', borderTopColor: 'transparent' }} />
+                    </div>
+                  ) : adminPredictions.length === 0 ? (
+                    <p className="text-[13px] text-muted-foreground text-center py-8">
+                      {t("noPredictionsFoundForMatch")}
+                    </p>
+                  ) : (
+                    <div className="overflow-y-auto flex-1">
+                      <table className="w-full text-left border-collapse text-[13px]">
+                        <thead>
+                          <tr className="border-b border-border bg-gray-50 text-muted-foreground font-extrabold uppercase tracking-wider text-[11px]">
+                            <th className="px-4 py-3">{t("colAccount")}</th>
+                            <th className="px-4 py-3 text-center">{t("theirPickCol")}</th>
+                            <th className="px-4 py-3 text-center">{t("statusCol")}</th>
+                            <th className="px-4 py-3 text-right">{t("pointsCol")}</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border">
+                          {adminPredictions.map((prediction) => (
+                            <tr key={prediction.id} className="hover:bg-[#fcfbf7]">
+                              <td className="px-4 py-3">
+                                <div className="font-bold text-foreground">{prediction.member.nickname}</div>
+                                <div className="text-[11px] text-muted-foreground">@{prediction.member.username} · {prediction.member.displayName}</div>
+                              </td>
+                              <td className="px-4 py-3 text-center font-black text-foreground">
+                                {prediction.homeScorePred} - {prediction.awayScorePred}
+                              </td>
+                              <td className="px-4 py-3 text-center">
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-extrabold border ${
+                                  prediction.resultType === "EXACT_SCORE"
+                                    ? "bg-amber-50 border-amber-200 text-amber-800"
+                                    : prediction.resultType === "CORRECT_RESULT"
+                                      ? "bg-green-50 border-green-200 text-green-700"
+                                      : prediction.resultType === "WRONG"
+                                        ? "bg-gray-100 border-gray-200 text-muted-foreground"
+                                        : "bg-blue-50 border-blue-200 text-blue-700"
+                                }`}>
+                                  {resultBadgeText(prediction.resultType)}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-right font-bold">
+                                {prediction.resultType === "PENDING" ? "-" : `+${prediction.points}`}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
 

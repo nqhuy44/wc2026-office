@@ -230,6 +230,23 @@ function SuperAdminContent() {
     }
   };
 
+  const handleChangeMemberRole = async (member: Participant) => {
+    const nextRole = member.role === "ADMIN" ? "PLAYER" : "ADMIN";
+    const confirmKey = nextRole === "ADMIN" ? "promoteToLeagueAdminConfirm" : "demoteFromLeagueAdminConfirm";
+    if (!confirm(t(confirmKey as any).replace("{name}", member.nickname))) return;
+
+    try {
+      const data = await apiClient<{ participant: Participant }>(`/superadmin/participants/${member.id}/role`, {
+        method: "PUT",
+        json: { role: nextRole }
+      });
+      setParticipants((prev) => prev.map((p) => p.id === member.id ? { ...p, role: data.participant.role } : p));
+      alert(t("leagueRoleChangedAlert").replace("{name}", member.nickname).replace("{role}", data.participant.role));
+    } catch (err: any) {
+      alert(err.code ? t(err.code as any) : t("errUnknown"));
+    }
+  };
+
   useEffect(() => {
     if (activeTab === "users") {
       loadGlobalUsers();
@@ -606,6 +623,12 @@ function SuperAdminContent() {
                             </span>
                           </td>
                           <td className="py-3.5 text-right space-x-2">
+                            <button
+                              onClick={() => handleChangeMemberRole(p)}
+                              className="p-1.5 text-emerald-700 hover:bg-emerald-50 rounded transition-all inline-flex items-center gap-1 text-[12px] font-bold"
+                            >
+                              {p.role === "ADMIN" ? t("demoteLeagueAdminBtn") : t("promoteLeagueAdminBtn")}
+                            </button>
                             <button
                               onClick={() => handleResetPasscode(p.id, p.nickname)}
                               className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-all inline-flex items-center gap-1 text-[12px] font-bold"
