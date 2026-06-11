@@ -427,9 +427,15 @@ export default function DashboardPage() {
                   <span className="text-[14px] font-bold">{lm.match.homeTeam.name}</span>
                 </div>
                 <div className="text-center">
-                  <div className="text-[36px] font-black tracking-wider px-4" style={{ letterSpacing: '3px' }}>
-                    {lm.match.homeScore ?? 0} — {lm.match.awayScore ?? 0}
-                  </div>
+                  {lm.match.homeScore !== null && lm.match.awayScore !== null ? (
+                    <div className="text-[36px] font-black tracking-wider px-4" style={{ letterSpacing: '3px' }}>
+                      {lm.match.homeScore} — {lm.match.awayScore}
+                    </div>
+                  ) : (
+                    <div className="px-4 py-1.5 rounded-lg border border-red-100 bg-red-50 text-[12px] font-extrabold uppercase tracking-wide text-destructive">
+                      {t("liveScorePending")}
+                    </div>
+                  )}
                   <div className="text-[13px] font-semibold text-destructive">
                     {t("inProgressStatus")}
                   </div>

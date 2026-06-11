@@ -183,6 +183,10 @@ export default function MatchesPage() {
                             )}
                             {isScored && <div className="text-[11px] text-muted-foreground mt-0.5">FT</div>}
                           </>
+                        ) : isLive ? (
+                          <div className="px-3 py-1.5 rounded-lg border border-red-100 bg-red-50 text-[11px] font-extrabold uppercase tracking-wide text-destructive text-center">
+                            {t("liveScorePending")}
+                          </div>
                         ) : (
                           <div className="text-[18px] font-bold text-gray-300">vs</div>
                         )}

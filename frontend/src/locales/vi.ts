@@ -175,6 +175,7 @@ export const vi = {
   allMatchesLink: "Tất cả trận đấu →",
   yourPrediction: "Dự đoán của bạn",
   noPrediction: "Không có dự đoán",
+  liveScorePending: "Chưa có tỉ số",
   nextMatchTitle: "⚡ Trận tiếp theo",
   locksBeforeKickoff: "Đóng cổng trước giờ bóng lăn",
   predictNow: "🎯 Dự đoán ngay →",

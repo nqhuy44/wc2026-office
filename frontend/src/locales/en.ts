@@ -175,6 +175,7 @@ export const en = {
   allMatchesLink: "All matches →",
   yourPrediction: "Your prediction",
   noPrediction: "No prediction",
+  liveScorePending: "Score pending",
   nextMatchTitle: "⚡ Next Match",
   locksBeforeKickoff: "Locks before kickoff",
   predictNow: "🎯 Predict now →",
