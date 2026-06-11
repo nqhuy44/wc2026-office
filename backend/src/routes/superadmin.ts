@@ -80,7 +80,7 @@ export async function superAdminRoutes(app: FastifyInstance) {
       id: m.id,
       nickname: m.nickname,
       role: m.role,
-      contributionStatus: m.contributionStatus,
+      confirmationStatus: m.confirmationStatus,
       joinedAt: m.joinedAt,
       createdAt: m.createdAt,
       username: m.user.username,
@@ -126,7 +126,7 @@ export async function superAdminRoutes(app: FastifyInstance) {
           id: member.id,
           nickname: member.nickname,
           role: member.role,
-          contributionStatus: member.contributionStatus,
+          confirmationStatus: member.confirmationStatus,
           username: member.user.username,
           displayName: member.user.displayName
         }
@@ -197,7 +197,7 @@ export async function superAdminRoutes(app: FastifyInstance) {
         id: updated.id,
         nickname: updated.nickname,
         role: updated.role,
-        contributionStatus: updated.contributionStatus,
+        confirmationStatus: updated.confirmationStatus,
         username: updated.user.username,
         displayName: updated.user.displayName
       },

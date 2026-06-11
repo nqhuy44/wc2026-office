@@ -32,7 +32,7 @@ interface Membership {
   leagueId: string;
   nickname: string;
   role: string; // PLAYER or ADMIN
-  contributionStatus: string;
+  confirmationStatus: string;
   league: {
     id: string;
     name: string;

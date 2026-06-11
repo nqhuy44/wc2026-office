@@ -23,9 +23,9 @@ enum MemberStatus {
   BANNED
 }
 
-enum ContributionStatus {
-  UNPAID
-  PAID
+enum MemberConfirmationStatus {
+  UNCONFIRMED
+  CONFIRMED
 }
 
 enum MatchStatus {
@@ -131,7 +131,7 @@ model LeagueMember {
   userId             String
   nickname           String             // User's display name inside this specific league
   role               ParticipantRole    @default(PLAYER) // Member's permission in the league (PLAYER or ADMIN)
-  contributionStatus ContributionStatus @default(UNPAID)
+  confirmationStatus MemberConfirmationStatus @default(UNCONFIRMED)
   joinedAt           DateTime           @default(now())
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt

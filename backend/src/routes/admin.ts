@@ -59,7 +59,7 @@ export async function adminRoutes(app: FastifyInstance) {
       id: m.id,
       nickname: m.nickname,
       role: m.role,
-      contributionStatus: m.contributionStatus,
+      confirmationStatus: m.confirmationStatus,
       joinedAt: m.joinedAt,
       createdAt: m.createdAt,
       username: m.user.username,
@@ -100,7 +100,7 @@ export async function adminRoutes(app: FastifyInstance) {
           id: member.id,
           nickname: member.nickname,
           role: member.role,
-          contributionStatus: member.contributionStatus,
+          confirmationStatus: member.confirmationStatus,
           username: member.user.username,
           displayName: member.user.displayName
         },
@@ -111,8 +111,8 @@ export async function adminRoutes(app: FastifyInstance) {
     }
   });
 
-  // Toggle contribution status (PAID/UNPAID)
-  app.put("/admin/participants/:memberId/toggle-contribution", { preHandler: [app.requireAdmin] }, async (request, reply) => {
+  // Toggle member confirmation status.
+  app.put("/admin/participants/:memberId/toggle-confirmation", { preHandler: [app.requireAdmin] }, async (request, reply) => {
     const { memberId } = request.params as { memberId: string };
     const leagueId = request.leagueMember!.leagueId;
 
@@ -124,11 +124,11 @@ export async function adminRoutes(app: FastifyInstance) {
       return reply.status(404).send({ error: "Not Found", code: "errMemberNotFound" });
     }
 
-    const nextStatus = member.contributionStatus === "PAID" ? "UNPAID" : "PAID";
+    const nextStatus = member.confirmationStatus === "CONFIRMED" ? "UNCONFIRMED" : "CONFIRMED";
 
     const updated = await prisma.leagueMember.update({
       where: { id: memberId },
-      data: { contributionStatus: nextStatus }
+      data: { confirmationStatus: nextStatus }
     });
 
     return {
@@ -136,9 +136,9 @@ export async function adminRoutes(app: FastifyInstance) {
         id: updated.id,
         nickname: updated.nickname,
         role: updated.role,
-        contributionStatus: updated.contributionStatus
+        confirmationStatus: updated.confirmationStatus
       },
-      message: `Đã cập nhật trạng thái đóng quỹ thành ${nextStatus === "PAID" ? "Đã đóng" : "Chưa đóng"}`
+      message: `Đã cập nhật trạng thái xác nhận thành ${nextStatus === "CONFIRMED" ? "Đã xác nhận" : "Chưa xác nhận"}`
     };
   });
 
@@ -180,7 +180,7 @@ export async function adminRoutes(app: FastifyInstance) {
         id: updated.id,
         nickname: updated.nickname,
         role: updated.role,
-        contributionStatus: updated.contributionStatus,
+        confirmationStatus: updated.confirmationStatus,
         username: updated.user.username,
         displayName: updated.user.displayName
       },

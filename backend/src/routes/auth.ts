@@ -77,7 +77,7 @@ export async function authRoutes(app: FastifyInstance) {
           leagueId: m.leagueId,
           nickname: m.nickname,
           role: m.role,
-          contributionStatus: m.contributionStatus,
+          confirmationStatus: m.confirmationStatus,
           league: {
             id: m.league.id,
             name: m.league.name,
@@ -218,7 +218,7 @@ export async function authRoutes(app: FastifyInstance) {
           leagueId: m.leagueId,
           nickname: m.nickname,
           role: m.role,
-          contributionStatus: m.contributionStatus,
+          confirmationStatus: m.confirmationStatus,
           league: {
             id: m.league.id,
             name: m.league.name,

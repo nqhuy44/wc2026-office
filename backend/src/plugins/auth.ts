@@ -17,7 +17,7 @@ declare module "fastify" {
       userId: string;
       nickname: string;
       role: string;
-      contributionStatus: string;
+      confirmationStatus: string;
       league: {
         id: string;
         name: string;
@@ -92,7 +92,7 @@ const authPlugin: FastifyPluginAsync = async (app) => {
       userId: member.userId,
       nickname: member.nickname,
       role: member.role,
-      contributionStatus: member.contributionStatus,
+      confirmationStatus: member.confirmationStatus,
       league: {
         id: member.league.id,
         name: member.league.name,
@@ -123,7 +123,7 @@ const authPlugin: FastifyPluginAsync = async (app) => {
         userId: request.user.id,
         nickname: request.user.displayName,
         role: "ADMIN" as any,
-        contributionStatus: "PAID" as any,
+        confirmationStatus: "CONFIRMED" as any,
         league: { id: league.id, name: league.name, slug: league.slug }
       };
       return;

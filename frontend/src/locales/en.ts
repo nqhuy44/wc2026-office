@@ -90,10 +90,10 @@ export const en = {
   colNickname: "Nickname",
   colAccount: "Account",
   colRole: "Role",
-  colContribution: "Contribution",
+  colConfirmation: "Confirmation",
   colActions: "Actions",
-  btnPaid: "💰 PAID",
-  btnUnpaid: "❌ UNPAID",
+  btnConfirmed: "Confirmed",
+  btnUnconfirmed: "Unconfirmed",
   btnRemove: "Remove",
   noMembers: "No members in this league yet. Use the form to enroll players!",
   confirmRemove: "Are you sure you want to remove member \"{name}\" from this league?",
@@ -103,7 +103,7 @@ export const en = {
 
   // Additional Admin page keys
   memberSuccessAdded: "Member successfully added!",
-  contributionToggleFailed: "Failed to toggle contribution status",
+  confirmationToggleFailed: "Failed to toggle confirmation status",
   memberRemoved: "Removed member from the league.",
   scoreSubmitted: "Match score submitted and points processed!",
   loadingAdminSettings: "Loading admin settings...",

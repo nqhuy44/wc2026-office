@@ -34,7 +34,7 @@ interface Participant {
   id: string;
   nickname: string;
   role: string;
-  contributionStatus: string;
+  confirmationStatus: string;
   username: string;
   displayName: string;
   isActive: boolean;

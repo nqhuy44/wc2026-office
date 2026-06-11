@@ -29,7 +29,7 @@ interface Participant {
   id: string;
   nickname: string;
   role: string;
-  contributionStatus: string;
+  confirmationStatus: string;
   username: string;
   displayName: string;
   isActive: boolean;
@@ -274,13 +274,13 @@ function AdminPageContent() {
     }
   };
 
-  const handleToggleContribution = async (memberId: string) => {
+  const handleToggleConfirmation = async (memberId: string) => {
     try {
-      const data = await apiClient<{ participant: { contributionStatus: string }; message: string }>(
-        `/admin/participants/${memberId}/toggle-contribution`,
+      const data = await apiClient<{ participant: { confirmationStatus: string }; message: string }>(
+        `/admin/participants/${memberId}/toggle-confirmation`,
         { method: "PUT" }
       );
-      setParticipants(prev => prev.map(p => p.id === memberId ? { ...p, contributionStatus: data.participant.contributionStatus } : p));
+      setParticipants(prev => prev.map(p => p.id === memberId ? { ...p, confirmationStatus: data.participant.confirmationStatus } : p));
     } catch (err: any) {
       alert(err.code ? t(err.code as any) : t("errUnknown"));
     }
@@ -627,7 +627,7 @@ function AdminPageContent() {
                       <th className="px-6 py-4">{t("colNickname")}</th>
                       <th className="px-6 py-4">{t("colAccount")}</th>
                       <th className="px-6 py-4">{t("colRole")}</th>
-                      <th className="px-6 py-4">{t("colContribution")}</th>
+                      <th className="px-6 py-4">{t("colConfirmation")}</th>
                       <th className="px-6 py-4 text-right pr-8">{t("colActions")}</th>
                     </tr>
                   </thead>
@@ -650,16 +650,16 @@ function AdminPageContent() {
                         </td>
                         <td className="px-6 py-4">
                           <button
-                            onClick={() => handleToggleContribution(p.id)}
+                            onClick={() => handleToggleConfirmation(p.id)}
                             className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold border transition-all ${
-                              p.contributionStatus === "PAID"
+                              p.confirmationStatus === "CONFIRMED"
                                 ? "bg-green-50 border-green-200 text-green-700 hover:bg-green-100"
                                 : "bg-red-50 border-red-200 text-red-700 hover:bg-red-100"
                             }`}
                           >
-                            {p.contributionStatus === "PAID" 
-                              ? t("btnPaid") 
-                              : t("btnUnpaid")
+                            {p.confirmationStatus === "CONFIRMED" 
+                              ? t("btnConfirmed") 
+                              : t("btnUnconfirmed")
                             }
                           </button>
                         </td>

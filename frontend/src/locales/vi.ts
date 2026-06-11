@@ -90,10 +90,10 @@ export const vi = {
   colNickname: "Biệt danh",
   colAccount: "Tài khoản",
   colRole: "Vai trò",
-  colContribution: "Đóng quỹ",
+  colConfirmation: "Xác nhận",
   colActions: "Hành động",
-  btnPaid: "💰 ĐÃ ĐÓNG",
-  btnUnpaid: "❌ CHƯA ĐÓNG",
+  btnConfirmed: "Đã xác nhận",
+  btnUnconfirmed: "Chưa xác nhận",
   btnRemove: "Xóa khỏi giải",
   noMembers: "Giải đấu chưa có thành viên nào. Hãy thêm thành viên bằng form bên cạnh!",
   confirmRemove: "Bạn có chắc muốn xóa thành viên \"{name}\" khỏi giải đấu này?",
@@ -103,7 +103,7 @@ export const vi = {
 
   // Additional Admin page keys
   memberSuccessAdded: "Thành viên đã được thêm thành công!",
-  contributionToggleFailed: "Không thể thay đổi trạng thái đóng quỹ",
+  confirmationToggleFailed: "Không thể thay đổi trạng thái xác nhận",
   memberRemoved: "Đã xóa thành viên khỏi giải đấu.",
   scoreSubmitted: "Đã lưu kết quả trận đấu và tính điểm thành công!",
   loadingAdminSettings: "Đang tải cài đặt admin...",
