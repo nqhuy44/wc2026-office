@@ -99,7 +99,7 @@ export default function ResultsPage() {
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-[13px]">
+              <table className="w-full min-w-[640px] text-left border-collapse text-[13px]">
                 <thead>
                   <tr className="border-b border-border bg-muted/65 text-muted-foreground font-extrabold uppercase tracking-wider text-[11px] bg-gray-50">
                     <th className="px-6 py-4">{t("matchTableHeader")}</th>

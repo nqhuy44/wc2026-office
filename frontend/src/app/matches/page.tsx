@@ -76,7 +76,7 @@ export default function MatchesPage() {
       </p>
 
       {/* Tabs */}
-      <div className="flex items-center justify-between mb-7">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-7">
         <div className="kp-tabs">
           {[
             { key: 'live' as TabKey, label: t("tabLive"), count: liveCount },
@@ -93,7 +93,7 @@ export default function MatchesPage() {
             </button>
           ))}
         </div>
-        <button onClick={loadMatches} className="kp-btn kp-btn-ghost kp-btn-sm">
+        <button onClick={loadMatches} className="kp-btn kp-btn-ghost kp-btn-sm self-start sm:self-auto">
           <RefreshCw size={13} className={loading ? "animate-spin" : ""} /> {t("refreshBtn")}
         </button>
       </div>

@@ -321,6 +321,11 @@
   border-radius: 10px;
   padding: 5px;
   box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
 }
 .kp-tab {
   padding: 8px 18px;
@@ -336,6 +341,9 @@
   display: flex;
   align-items: center;
   gap: 6px;
+  flex: 0 0 auto;
+  white-space: nowrap;
+  min-height: 38px;
 }
 .kp-tab:hover { color: #374151; background: #F9FAFB; }
 .kp-tab-active {

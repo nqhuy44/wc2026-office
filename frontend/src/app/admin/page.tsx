@@ -621,7 +621,7 @@ function AdminPageContent() {
                 </p>
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-[13px]">
+                <table className="w-full min-w-[760px] text-left border-collapse text-[13px]">
                   <thead>
                     <tr className="border-b border-border bg-muted/65 text-muted-foreground font-extrabold uppercase tracking-wider text-[11px] bg-gray-50">
                       <th className="px-6 py-4">{t("colNickname")}</th>
@@ -757,12 +757,12 @@ function AdminPageContent() {
 
               {/* Filters */}
               <div className="px-6 py-3 border-b border-border flex flex-col sm:flex-row items-start sm:items-center gap-3">
-                <div className="flex gap-1.5">
+                <div className="flex gap-1.5 max-w-full overflow-x-auto pb-1">
                   {(["all", "open", "closed", "done"] as const).map((f) => (
                     <button
                       key={f}
                       onClick={() => setMatchFilter(f)}
-                      className={`px-3 py-1.5 text-[12px] font-bold rounded-lg border transition-all ${
+                      className={`flex-none whitespace-nowrap px-3 py-1.5 text-[12px] font-bold rounded-lg border transition-all ${
                         matchFilter === f
                           ? "border-[#2F7D5C] bg-[#E8F5E9] text-[#2F7D5C]"
                           : "border-border bg-white text-muted-foreground hover:bg-gray-50"
@@ -808,7 +808,7 @@ function AdminPageContent() {
                 </p>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse text-[13px]">
+                  <table className="w-full min-w-[1080px] text-left border-collapse text-[13px]">
                     <colgroup>
                       <col className="w-[160px]" />
                       <col />
@@ -1036,7 +1036,7 @@ function AdminPageContent() {
                 </p>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse text-[13px]">
+                  <table className="w-full min-w-[860px] text-left border-collapse text-[13px]">
                     <thead>
                       <tr className="border-b border-border bg-muted/65 text-muted-foreground font-extrabold uppercase tracking-wider text-[11px] bg-gray-50">
                         <th className="px-6 py-4">{t("stage")}</th>
@@ -1154,7 +1154,7 @@ function AdminPageContent() {
                           </p>
                         ) : (
                           <div className="border border-border rounded-lg overflow-x-auto">
-                            <table className="w-full text-left border-collapse text-[13px]">
+                            <table className="w-full min-w-[640px] text-left border-collapse text-[13px]">
                               <thead>
                                 <tr className="border-b border-border bg-gray-50 text-muted-foreground font-extrabold uppercase tracking-wider text-[11px]">
                                   <th className="px-4 py-3">{t("colAccount")}</th>
@@ -1207,7 +1207,7 @@ function AdminPageContent() {
                           </p>
                         ) : (
                           <div className="border border-border rounded-lg overflow-x-auto">
-                            <table className="w-full text-left border-collapse text-[13px]">
+                            <table className="w-full min-w-[560px] text-left border-collapse text-[13px]">
                               <thead>
                                 <tr className="border-b border-border bg-gray-50 text-muted-foreground font-extrabold uppercase tracking-wider text-[11px]">
                                   <th className="px-4 py-3">{t("colAccount")}</th>
@@ -1257,7 +1257,7 @@ function AdminPageContent() {
             </div>
             
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-[13px]">
+              <table className="w-full min-w-[760px] text-left border-collapse text-[13px]">
                 <thead>
                   <tr className="border-b border-border bg-muted/65 text-muted-foreground font-extrabold uppercase tracking-wider text-[11px] bg-gray-50">
                     <th className="px-6 py-4">{t("stage")}</th>

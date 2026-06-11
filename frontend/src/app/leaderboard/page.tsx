@@ -111,7 +111,8 @@ export default function LeaderboardPage() {
 
           {/* Leaderboard Table */}
           <div className="kp-card" style={{ padding: 0, overflow: 'hidden' }}>
-            <table className="kp-table">
+            <div className="overflow-x-auto">
+            <table className="kp-table min-w-[760px]">
               <thead>
                 <tr>
                   <th style={{ width: '44px' }}>#</th>
@@ -171,6 +172,7 @@ export default function LeaderboardPage() {
                 })}
               </tbody>
             </table>
+            </div>
 
           </div>
 
@@ -215,7 +217,8 @@ export default function LeaderboardPage() {
                     {t("championPickNoData")}
                   </p>
                 ) : (
-                  <table className="kp-table">
+                  <div className="overflow-x-auto">
+                  <table className="kp-table min-w-[560px]">
                     <thead>
                       <tr>
                         <th>{t("championPickColMember")}</th>
@@ -266,6 +269,7 @@ export default function LeaderboardPage() {
                       })}
                     </tbody>
                   </table>
+                  </div>
                 )}
               </div>
             </div>

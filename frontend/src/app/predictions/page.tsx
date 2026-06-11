@@ -126,9 +126,9 @@ export default function PredictionsPage() {
 
             return (
               <Link key={lm.id} href={`/matches/${lm.id}`} className="block">
-                <div className="kp-card flex items-center gap-4 hover:shadow-md transition-shadow" style={{ padding: '14px 18px' }}>
+                <div className="kp-card flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 hover:shadow-md transition-shadow" style={{ padding: '14px 18px' }}>
                   {/* Teams */}
-                  <div className="flex-1 min-w-0">
+                  <div className="w-full sm:flex-1 min-w-0">
                     <div className="text-[14px] font-semibold text-foreground truncate flex items-center gap-2">
                       <TeamLogo name={lm.match.homeTeam.name} flagUrl={lm.match.homeTeam.flagUrl} className="w-7 h-7" imageClassName="w-5 h-5" fallbackClassName="text-[18px]" />
                       <span className="truncate">{lm.match.homeTeam.name} vs {lm.match.awayTeam.name}</span>
@@ -139,8 +139,8 @@ export default function PredictionsPage() {
                     </div>
                   </div>
                   {/* Pick */}
-                  <div className="text-center">
-                    <div className="text-[11px] text-muted-foreground font-semibold uppercase">
+                  <div className="flex items-center justify-between sm:block sm:text-center sm:min-w-[82px]">
+                    <div className="text-[11px] text-muted-foreground font-semibold uppercase sm:mb-0">
                       {t("yourPick")}
                     </div>
                     <div className="text-[16px] font-black">{p.homeScorePred} – {p.awayScorePred}</div>
@@ -148,13 +148,13 @@ export default function PredictionsPage() {
                   {/* Result */}
                   {isScored && hasFinal && (
                     <>
-                      <div className="text-center">
+                      <div className="flex items-center justify-between sm:block sm:text-center sm:min-w-[82px]">
                         <div className="text-[11px] text-muted-foreground font-semibold uppercase">
                           {t("finalResult")}
                         </div>
                         <div className="text-[16px] font-black">{lm.match.homeScore} – {lm.match.awayScore}</div>
                       </div>
-                      <div className="flex flex-col items-end gap-0.5 min-w-[80px]">
+                      <div className="flex flex-row sm:flex-col items-center sm:items-end justify-between gap-2 sm:gap-0.5 sm:min-w-[80px]">
                         <span className={`text-[13px] font-bold px-2.5 py-0.5 rounded-md ${isExact ? 'kp-pts-exact' : isCorrect ? 'kp-pts-correct' : 'kp-pts-wrong'}`}>
                           +{p.points} {language === "vi" ? "đ" : "pts"}
                         </span>
@@ -170,7 +170,7 @@ export default function PredictionsPage() {
                     </>
                   )}
                   {!isScored && (
-                    <span className="kp-badge kp-badge-upcoming text-[11px]">
+                    <span className="kp-badge kp-badge-upcoming text-[11px] self-start sm:self-auto">
                       {t("pendingFilter")}
                     </span>
                   )}

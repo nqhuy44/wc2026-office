@@ -339,10 +339,10 @@ function SuperAdminContent() {
         </div>
 
         {/* Tabs Bar */}
-        <div className="flex border-b border-border">
+        <div className="flex border-b border-border overflow-x-auto">
           <button
             onClick={() => router.push("/superadmin?tab=leagues")}
-            className={`px-6 py-3.5 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${
+            className={`flex-none whitespace-nowrap px-6 py-3.5 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${
               activeTab === "leagues" 
                 ? "border-primary text-primary" 
                 : "border-transparent text-muted-foreground hover:text-foreground"
@@ -357,7 +357,7 @@ function SuperAdminContent() {
           </button>
           <button
             onClick={() => router.push("/superadmin?tab=members")}
-            className={`px-6 py-3.5 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${
+            className={`flex-none whitespace-nowrap px-6 py-3.5 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${
               activeTab === "members" 
                 ? "border-primary text-primary" 
                 : "border-transparent text-muted-foreground hover:text-foreground"
@@ -372,7 +372,7 @@ function SuperAdminContent() {
           </button>
           <button
             onClick={() => router.push("/superadmin?tab=users")}
-            className={`px-6 py-3.5 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${
+            className={`flex-none whitespace-nowrap px-6 py-3.5 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${
               activeTab === "users" 
                 ? "border-primary text-primary" 
                 : "border-transparent text-muted-foreground hover:text-foreground"
@@ -450,7 +450,7 @@ function SuperAdminContent() {
                 </p>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
+                  <table className="w-full min-w-[640px] text-left border-collapse">
                     <thead>
                       <tr className="border-b border-border">
                         <th className="pb-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{t("leagueNameLabel")}</th>
@@ -598,7 +598,7 @@ function SuperAdminContent() {
                 </p>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
+                  <table className="w-full min-w-[760px] text-left border-collapse">
                     <thead>
                       <tr className="border-b border-border">
                         <th className="pb-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{t("colUserInfo")}</th>
@@ -683,7 +683,7 @@ function SuperAdminContent() {
               </p>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
+                <table className="w-full min-w-[860px] text-left border-collapse">
                   <thead>
                     <tr className="border-b border-border">
                       <th className="pb-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{t("colAccount")}</th>
