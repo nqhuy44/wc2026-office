@@ -300,6 +300,25 @@ export async function adminRoutes(app: FastifyInstance) {
         { updatedAt: "asc" }
       ]
     });
+    const predictedMemberIds = new Set(predictions.map((prediction) => prediction.memberId));
+    const missingMembers = await prisma.leagueMember.findMany({
+      where: {
+        leagueId,
+        id: { notIn: Array.from(predictedMemberIds) }
+      },
+      include: {
+        user: {
+          select: {
+            username: true,
+            displayName: true
+          }
+        }
+      },
+      orderBy: [
+        { nickname: "asc" },
+        { createdAt: "asc" }
+      ]
+    });
 
     return {
       leagueMatch,
@@ -317,6 +336,13 @@ export async function adminRoutes(app: FastifyInstance) {
           username: prediction.member.user.username,
           displayName: prediction.member.user.displayName
         }
+      })),
+      missingMembers: missingMembers.map((member) => ({
+        id: member.id,
+        nickname: member.nickname,
+        role: member.role,
+        username: member.user.username,
+        displayName: member.user.displayName
       }))
     };
   });

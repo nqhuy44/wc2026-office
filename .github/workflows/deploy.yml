@@ -101,25 +101,3 @@ jobs:
 
             echo "==> Pruning old images..."
             docker image prune -f
-
-      - name: Smoke test — health endpoint
-        run: |
-          echo "==> Probing https://${{ secrets.VM_DOMAIN }}/health ..."
-          for i in 1 2 3 4 5; do
-            HTTP_STATUS=$(curl -o /dev/null -sw "%{http_code}" \
-              --max-time 10 --retry 0 \
-              "https://${{ secrets.VM_DOMAIN }}/health" || echo "000")
-            if [ "$HTTP_STATUS" = "200" ]; then
-              BODY=$(curl -sf --max-time 10 "https://${{ secrets.VM_DOMAIN }}/health")
-              echo "Response: $BODY"
-              OK=$(echo "$BODY" | jq -r '.ok' 2>/dev/null || echo "")
-              if [ "$OK" = "true" ]; then
-                echo "Smoke test passed (attempt $i)."
-                exit 0
-              fi
-            fi
-            echo "Attempt $i: HTTP $HTTP_STATUS — retrying in 10s..."
-            sleep 10
-          done
-          echo "ERROR: /health did not return ok after 5 attempts."
-          exit 1

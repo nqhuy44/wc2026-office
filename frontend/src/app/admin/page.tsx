@@ -89,6 +89,14 @@ interface AdminPrediction {
   };
 }
 
+interface MissingPredictionMember {
+  id: string;
+  nickname: string;
+  role: string;
+  username: string;
+  displayName: string;
+}
+
 const TEAM_FLAG_FALLBACK: Record<string, string> = {
   Argentina: "🇦🇷",
   Australia: "🇦🇺",
@@ -185,6 +193,7 @@ function AdminPageContent() {
   const [championSaving, setChampionSaving] = useState(false);
   const [selectedPredictionMatch, setSelectedPredictionMatch] = useState<LeagueMatch | null>(null);
   const [adminPredictions, setAdminPredictions] = useState<AdminPrediction[]>([]);
+  const [missingPredictionMembers, setMissingPredictionMembers] = useState<MissingPredictionMember[]>([]);
   const [loadingAdminPredictions, setLoadingAdminPredictions] = useState(false);
 
   useEffect(() => {
@@ -388,9 +397,11 @@ function AdminPageContent() {
     setSelectedPredictionMatch(leagueMatch);
     setLoadingAdminPredictions(true);
     setAdminPredictions([]);
+    setMissingPredictionMembers([]);
     try {
-      const data = await apiClient<{ predictions: AdminPrediction[] }>(`/admin/matches/${leagueMatch.id}/predictions`);
+      const data = await apiClient<{ predictions: AdminPrediction[]; missingMembers: MissingPredictionMember[] }>(`/admin/matches/${leagueMatch.id}/predictions`);
       setAdminPredictions(data.predictions);
+      setMissingPredictionMembers(data.missingMembers);
     } catch (err: any) {
       alert(err.code ? t(err.code as any) : t("errUnknown"));
       setSelectedPredictionMatch(null);
@@ -424,6 +435,13 @@ function AdminPageContent() {
   const predictionReviewMatches = matches.filter(
     (lm) => lm.isPredictionEnabled && !["SCHEDULED", "VOID"].includes(lm.status)
   );
+  const selectedPredictionMatchHasStarted = selectedPredictionMatch
+    ? ["LIVE", "FINISHED", "SCORED", "VOID"].includes(selectedPredictionMatch.status) ||
+      new Date(selectedPredictionMatch.match.kickoffAt).getTime() <= now
+    : false;
+  const missingPredictionStatusLabel = selectedPredictionMatchHasStarted
+    ? t("didNotPredictStatus")
+    : t("notPredictedStatus");
 
   if (loading) {
     return (
@@ -1083,7 +1101,7 @@ function AdminPageContent() {
 
             {selectedPredictionMatch && (
               <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/20 backdrop-blur-[2px]">
-                <div className="w-full max-w-[720px] bg-white border border-border rounded-lg p-6 shadow-[0_24px_50px_rgba(31,41,55,0.16)] flex flex-col max-h-[90vh]">
+                <div className="w-full max-w-[860px] bg-white border border-border rounded-lg p-6 shadow-[0_24px_50px_rgba(31,41,55,0.16)] flex flex-col max-h-[90vh]">
                   <div className="flex items-start justify-between border-b border-border pb-3 mb-4 gap-4">
                     <div>
                       <h3 className="text-[17px] font-bold text-foreground">
@@ -1105,51 +1123,120 @@ function AdminPageContent() {
                     <div className="flex justify-center py-12">
                       <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" style={{ borderColor: '#2F7D5C', borderTopColor: 'transparent' }} />
                     </div>
-                  ) : adminPredictions.length === 0 ? (
-                    <p className="text-[13px] text-muted-foreground text-center py-8">
-                      {t("noPredictionsFoundForMatch")}
-                    </p>
                   ) : (
-                    <div className="overflow-y-auto flex-1">
-                      <table className="w-full text-left border-collapse text-[13px]">
-                        <thead>
-                          <tr className="border-b border-border bg-gray-50 text-muted-foreground font-extrabold uppercase tracking-wider text-[11px]">
-                            <th className="px-4 py-3">{t("colAccount")}</th>
-                            <th className="px-4 py-3 text-center">{t("theirPickCol")}</th>
-                            <th className="px-4 py-3 text-center">{t("statusCol")}</th>
-                            <th className="px-4 py-3 text-right">{t("pointsCol")}</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border">
-                          {adminPredictions.map((prediction) => (
-                            <tr key={prediction.id} className="hover:bg-[#fcfbf7]">
-                              <td className="px-4 py-3">
-                                <div className="font-bold text-foreground">{prediction.member.nickname}</div>
-                                <div className="text-[11px] text-muted-foreground">@{prediction.member.username} · {prediction.member.displayName}</div>
-                              </td>
-                              <td className="px-4 py-3 text-center font-black text-foreground">
-                                {prediction.homeScorePred} - {prediction.awayScorePred}
-                              </td>
-                              <td className="px-4 py-3 text-center">
-                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-extrabold border ${
-                                  prediction.resultType === "EXACT_SCORE"
-                                    ? "bg-amber-50 border-amber-200 text-amber-800"
-                                    : prediction.resultType === "CORRECT_RESULT"
-                                      ? "bg-green-50 border-green-200 text-green-700"
-                                      : prediction.resultType === "WRONG"
-                                        ? "bg-gray-100 border-gray-200 text-muted-foreground"
-                                        : "bg-blue-50 border-blue-200 text-blue-700"
-                                }`}>
-                                  {resultBadgeText(prediction.resultType)}
-                                </span>
-                              </td>
-                              <td className="px-4 py-3 text-right font-bold">
-                                {prediction.resultType === "PENDING" ? "-" : `+${prediction.points}`}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                    <div className="overflow-y-auto flex-1 pr-1 space-y-5">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="rounded-lg border border-green-100 bg-green-50 px-4 py-3">
+                          <div className="text-[11px] font-extrabold uppercase tracking-wider text-green-700">
+                            {t("adminPredictedCount")}
+                          </div>
+                          <div className="text-[24px] font-black text-foreground mt-1">
+                            {adminPredictions.length}
+                          </div>
+                        </div>
+                        <div className="rounded-lg border border-amber-100 bg-amber-50 px-4 py-3">
+                          <div className="text-[11px] font-extrabold uppercase tracking-wider text-amber-700">
+                            {t("adminMissingPredictionCount")}
+                          </div>
+                          <div className="text-[24px] font-black text-foreground mt-1">
+                            {missingPredictionMembers.length}
+                          </div>
+                        </div>
+                      </div>
+
+                      <section>
+                        <h4 className="text-[13px] font-extrabold text-foreground mb-2">
+                          {t("membersPredictedTitle")}
+                        </h4>
+                        {adminPredictions.length === 0 ? (
+                          <p className="text-[13px] text-muted-foreground text-center py-6 border border-border rounded-lg bg-gray-50">
+                            {t("noPredictionsFoundForMatch")}
+                          </p>
+                        ) : (
+                          <div className="border border-border rounded-lg overflow-x-auto">
+                            <table className="w-full text-left border-collapse text-[13px]">
+                              <thead>
+                                <tr className="border-b border-border bg-gray-50 text-muted-foreground font-extrabold uppercase tracking-wider text-[11px]">
+                                  <th className="px-4 py-3">{t("colAccount")}</th>
+                                  <th className="px-4 py-3 text-center">{t("theirPickCol")}</th>
+                                  <th className="px-4 py-3 text-center">{t("statusCol")}</th>
+                                  <th className="px-4 py-3 text-right">{t("pointsCol")}</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-border">
+                                {adminPredictions.map((prediction) => (
+                                  <tr key={prediction.id} className="hover:bg-[#fcfbf7]">
+                                    <td className="px-4 py-3">
+                                      <div className="font-bold text-foreground">{prediction.member.nickname}</div>
+                                      <div className="text-[11px] text-muted-foreground">@{prediction.member.username} · {prediction.member.displayName}</div>
+                                    </td>
+                                    <td className="px-4 py-3 text-center font-black text-foreground">
+                                      {prediction.homeScorePred} - {prediction.awayScorePred}
+                                    </td>
+                                    <td className="px-4 py-3 text-center">
+                                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-extrabold border ${
+                                        prediction.resultType === "EXACT_SCORE"
+                                          ? "bg-amber-50 border-amber-200 text-amber-800"
+                                          : prediction.resultType === "CORRECT_RESULT"
+                                            ? "bg-green-50 border-green-200 text-green-700"
+                                            : prediction.resultType === "WRONG"
+                                              ? "bg-gray-100 border-gray-200 text-muted-foreground"
+                                              : "bg-blue-50 border-blue-200 text-blue-700"
+                                      }`}>
+                                        {resultBadgeText(prediction.resultType)}
+                                      </span>
+                                    </td>
+                                    <td className="px-4 py-3 text-right font-bold">
+                                      {prediction.resultType === "PENDING" ? "-" : `+${prediction.points}`}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </section>
+
+                      <section>
+                        <h4 className="text-[13px] font-extrabold text-foreground mb-2">
+                          {t("membersMissingPredictionTitle")}
+                        </h4>
+                        {missingPredictionMembers.length === 0 ? (
+                          <p className="text-[13px] text-green-700 text-center py-6 border border-green-100 rounded-lg bg-green-50">
+                            {t("allMembersPredicted")}
+                          </p>
+                        ) : (
+                          <div className="border border-border rounded-lg overflow-x-auto">
+                            <table className="w-full text-left border-collapse text-[13px]">
+                              <thead>
+                                <tr className="border-b border-border bg-gray-50 text-muted-foreground font-extrabold uppercase tracking-wider text-[11px]">
+                                  <th className="px-4 py-3">{t("colAccount")}</th>
+                                  <th className="px-4 py-3">{t("colRole")}</th>
+                                  <th className="px-4 py-3 text-right">{t("statusCol")}</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-border">
+                                {missingPredictionMembers.map((member) => (
+                                  <tr key={member.id} className="hover:bg-[#fcfbf7]">
+                                    <td className="px-4 py-3">
+                                      <div className="font-bold text-foreground">{member.nickname}</div>
+                                      <div className="text-[11px] text-muted-foreground">@{member.username} · {member.displayName}</div>
+                                    </td>
+                                    <td className="px-4 py-3 text-muted-foreground font-bold">
+                                      {member.role}
+                                    </td>
+                                    <td className="px-4 py-3 text-right">
+                                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-extrabold border border-amber-200 bg-amber-50 text-amber-800">
+                                        {missingPredictionStatusLabel}
+                                      </span>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </section>
                     </div>
                   )}
                 </div>
