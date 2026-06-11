@@ -561,7 +561,8 @@ export const vi = {
 
   // Champion Pick
   championPickTitle: "Dự đoán Đội Vô Địch",
-  championPickSub: "Chọn 1 đội bạn tin sẽ vô địch World Cup 2026. Khóa lúc 00:00 ngày 12/06.",
+  championPickSub: "Chọn 1 đội bạn tin sẽ vô địch World Cup 2026.",
+  championPickLocksAt: "Khóa lúc {time}",
   championPickBtn: "Chọn đội vô địch",
   championPickChange: "Thay đổi",
   championPickLocked: "Đã khóa",
@@ -584,6 +585,13 @@ export const vi = {
   championPickNotRevealed: "Chưa tiết lộ (chưa khóa)",
   adminSetChampion: "Đặt đội vô địch",
   adminSetChampionSub: "Xác nhận đội đã vô địch World Cup 2026 để tính điểm dự đoán.",
+  adminChampionPickLockTitle: "Khóa dự đoán đội vô địch",
+  adminChampionPickLockSub: "Admin có thể khóa ngay, hoặc mở lại bằng cách đặt thời điểm khóa mới trong tương lai.",
+  adminChampionPickLockAt: "Thời điểm khóa",
+  adminChampionPickLockSave: "Lưu thời điểm khóa",
+  adminChampionPickLockNow: "Khóa ngay",
+  adminChampionPickReopenAfterGroups: "Mở lại sau vòng bảng",
+  adminChampionPickLockSaved: "Đã cập nhật thời điểm khóa dự đoán đội vô địch.",
   adminChampionNone: "Chưa xác nhận",
   adminChampionSave: "Xác nhận vô địch",
   adminChampionSaved: "Đã cập nhật đội vô địch!",

@@ -9,8 +9,8 @@ import { AlertCircle, GitBranch, Trophy } from "lucide-react";
 interface Team {
   id: string;
   name: string;
-  shortName: string;
-  flagUrl: string;
+  shortName: string | null;
+  flagUrl: string | null;
 }
 
 interface Match {
@@ -42,6 +42,30 @@ interface GroupTeamStats {
   ga: number;
   gd: number;
   pts: number;
+}
+
+interface ProviderStandingRow {
+  position: number;
+  team: Team;
+  playedGames: number;
+  won: number;
+  draw: number;
+  lost: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  goalDifference: number;
+  points: number;
+}
+
+interface ProviderGroupStanding {
+  group: string;
+  rows: ProviderStandingRow[];
+}
+
+interface ProviderStandingsResponse {
+  source: "provider";
+  groups: ProviderGroupStanding[];
+  fetchedAt: string;
 }
 
 type ViewMode = "groups" | "knockout";
@@ -219,10 +243,11 @@ function teamFallback(team: Team) {
 }
 
 function TeamMark({ team }: { team: Team }) {
-  if (isImageUrl(team.flagUrl)) {
+  const flagUrl = team.flagUrl;
+  if (flagUrl && isImageUrl(flagUrl)) {
     return (
       <span className="w-7 h-7 rounded-full border border-border bg-white shadow-sm overflow-hidden grid place-items-center shrink-0">
-        <img src={team.flagUrl} alt={`${team.name} logo`} className="w-5 h-5 object-contain" />
+        <img src={flagUrl} alt={`${team.name} logo`} className="w-5 h-5 object-contain" />
       </span>
     );
   }
@@ -314,6 +339,7 @@ function getLoser(match: ResolvedKnockoutMatch): ResolvedEntrant | undefined {
 
 export default function StandingsPage() {
   const [matches, setMatches] = useState<LeagueMatch[]>([]);
+  const [providerStandings, setProviderStandings] = useState<Record<string, GroupTeamStats[]>>({});
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>("groups");
   const { language, t } = useLanguage();
@@ -325,8 +351,32 @@ export default function StandingsPage() {
   const load = async () => {
     setLoading(true);
     try {
-      const data = await apiClient<{ matches: LeagueMatch[] }>("/matches?all=true");
-      setMatches(data.matches);
+      const [matchesData, standingsData] = await Promise.all([
+        apiClient<{ matches: LeagueMatch[] }>("/matches?all=true"),
+        apiClient<ProviderStandingsResponse>("/standings").catch(() => null)
+      ]);
+      setMatches(matchesData.matches);
+      setProviderStandings(
+        standingsData
+          ? Object.fromEntries(
+              standingsData.groups.map((standing) => [
+                standing.group,
+                standing.rows.map((row) => ({
+                  team: row.team,
+                  group: standing.group,
+                  mp: row.playedGames,
+                  w: row.won,
+                  d: row.draw,
+                  l: row.lost,
+                  gf: row.goalsFor,
+                  ga: row.goalsAgainst,
+                  gd: row.goalDifference,
+                  pts: row.points
+                }))
+              ])
+            )
+          : {}
+      );
     } catch (error) {
       console.error(error);
     } finally {
@@ -338,8 +388,8 @@ export default function StandingsPage() {
     const fromData = matches
       .filter((lm) => lm.match.stage === "GROUP" && lm.match.groupName)
       .map((lm) => lm.match.groupName);
-    return sortGroups(Array.from(new Set([...WORLD_CUP_GROUPS, ...fromData])));
-  }, [matches]);
+    return sortGroups(Array.from(new Set([...WORLD_CUP_GROUPS, ...fromData, ...Object.keys(providerStandings)])));
+  }, [matches, providerStandings]);
 
   const computeGroup = (group: string): GroupTeamStats[] => {
     const statsByTeam: Record<string, GroupTeamStats> = {};
@@ -401,8 +451,8 @@ export default function StandingsPage() {
   };
 
   const groupStandings = useMemo(() => {
-    return Object.fromEntries(groups.map((group) => [group, computeGroup(group)]));
-  }, [groups, matches]);
+    return Object.fromEntries(groups.map((group) => [group, providerStandings[group] ?? computeGroup(group)]));
+  }, [groups, matches, providerStandings]);
 
   const knockoutByRound = useMemo(() => {
     const actualMatchesByStage = KNOCKOUT_ROUNDS.reduce<Record<string, LeagueMatch[]>>((acc, round) => {
@@ -416,6 +466,11 @@ export default function StandingsPage() {
     const resolvedByMatchNo = new Map<number, ResolvedKnockoutMatch>();
 
     const groupIsComplete = (group: string) => {
+      const providerRows = providerStandings[group];
+      if (providerRows) {
+        return providerRows.length === 4 && providerRows.every((row) => row.mp >= 3);
+      }
+
       const shouldUseOfficialOnly = hasOfficialGroupFixtures(matches, group);
       const groupMatches = matches.filter(
         (lm) =>
@@ -561,14 +616,16 @@ export default function StandingsPage() {
             {groups.map((group) => {
               const rows = groupStandings[group] ?? [];
               const shouldUseOfficialOnly = hasOfficialGroupFixtures(matches, group);
-              const playedMatches = matches.filter(
-                (lm) =>
-                  lm.match.stage === "GROUP" &&
-                  lm.match.groupName === group &&
-                  (!shouldUseOfficialOnly || Boolean(lm.match.externalMatchId)) &&
-                  lm.match.homeScore !== null &&
-                  lm.match.awayScore !== null
-              ).length;
+              const playedMatches = providerStandings[group]
+                ? Math.floor(providerStandings[group].reduce((total, row) => total + row.mp, 0) / 2)
+                : matches.filter(
+                    (lm) =>
+                      lm.match.stage === "GROUP" &&
+                      lm.match.groupName === group &&
+                      (!shouldUseOfficialOnly || Boolean(lm.match.externalMatchId)) &&
+                      lm.match.homeScore !== null &&
+                      lm.match.awayScore !== null
+                  ).length;
 
               return (
                 <article key={group} className="kp-card" style={{ padding: 0, overflow: "hidden" }}>

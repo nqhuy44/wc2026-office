@@ -4,6 +4,30 @@ import { scoreMatch } from "./scoring.js";
 
 const API_BASE = "https://api.football-data.org/v4";
 
+export interface ProviderStandingRow {
+  position: number;
+  team: {
+    id: string;
+    name: string;
+    shortName: string | null;
+    countryCode: string | null;
+    flagUrl: string | null;
+  };
+  playedGames: number;
+  won: number;
+  draw: number;
+  lost: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  goalDifference: number;
+  points: number;
+}
+
+export interface ProviderGroupStanding {
+  group: string;
+  rows: ProviderStandingRow[];
+}
+
 function mapStatus(apiStatus: string): any {
   switch (apiStatus) {
     case "SCHEDULED":
@@ -155,4 +179,58 @@ export async function fetchWorldCupMatches() {
   } catch (error) {
     console.error("Error syncing football matches:", error);
   }
+}
+
+function normalizeProviderGroup(group: string | null | undefined) {
+  if (!group) return null;
+  return group.replace(/^GROUP_/i, "").replace(/^Group\s+/i, "").trim().toUpperCase();
+}
+
+export async function fetchWorldCupStandings(): Promise<ProviderGroupStanding[]> {
+  const apiKey = env.FOOTBALL_DATA_API_KEY;
+  if (!apiKey || apiKey === "your_api_key_here") {
+    throw new Error("FOOTBALL_DATA_API_KEY is missing");
+  }
+
+  const response = await fetch(`${API_BASE}/competitions/WC/standings`, {
+    headers: {
+      "X-Auth-Token": apiKey
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(`API Error: ${response.statusText}`);
+  }
+
+  const data = await response.json() as any;
+  const standings = Array.isArray(data.standings) ? data.standings : [];
+
+  return standings
+    .map((standing: any) => {
+      const group = normalizeProviderGroup(standing.group);
+      if (!group || !Array.isArray(standing.table)) return null;
+
+      return {
+        group,
+        rows: standing.table.map((row: any) => ({
+          position: row.position,
+          team: {
+            id: String(row.team?.id),
+            name: row.team?.name ?? "TBD",
+            shortName: row.team?.shortName ?? row.team?.tla ?? null,
+            countryCode: row.team?.tla ?? null,
+            flagUrl: row.team?.crest ?? null
+          },
+          playedGames: row.playedGames ?? 0,
+          won: row.won ?? 0,
+          draw: row.draw ?? 0,
+          lost: row.lost ?? 0,
+          goalsFor: row.goalsFor ?? 0,
+          goalsAgainst: row.goalsAgainst ?? 0,
+          goalDifference: row.goalDifference ?? 0,
+          points: row.points ?? 0
+        }))
+      } satisfies ProviderGroupStanding;
+    })
+    .filter((standing: ProviderGroupStanding | null): standing is ProviderGroupStanding => Boolean(standing));
 }

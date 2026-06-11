@@ -561,7 +561,8 @@ export const en = {
 
   // Champion Pick
   championPickTitle: "Champion Prediction",
-  championPickSub: "Pick 1 team you believe will win WC 2026. Locks at midnight on June 12.",
+  championPickSub: "Pick 1 team you believe will win WC 2026.",
+  championPickLocksAt: "Locks at {time}",
   championPickBtn: "Pick champion",
   championPickChange: "Change",
   championPickLocked: "Locked",
@@ -584,6 +585,13 @@ export const en = {
   championPickNotRevealed: "Not revealed (not locked yet)",
   adminSetChampion: "Set Champion Team",
   adminSetChampionSub: "Confirm the World Cup 2026 champion to score champion picks.",
+  adminChampionPickLockTitle: "Champion pick lock",
+  adminChampionPickLockSub: "Admins can lock immediately, or reopen by setting a new future lock time.",
+  adminChampionPickLockAt: "Lock time",
+  adminChampionPickLockSave: "Save lock time",
+  adminChampionPickLockNow: "Lock now",
+  adminChampionPickReopenAfterGroups: "Reopen after groups",
+  adminChampionPickLockSaved: "Champion pick lock time updated.",
   adminChampionNone: "Not confirmed",
   adminChampionSave: "Confirm champion",
   adminChampionSaved: "Champion team updated!",

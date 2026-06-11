@@ -3,6 +3,7 @@ import z from "zod";
 import { prisma } from "../lib/prisma.js";
 import { hashString, generatePasscode } from "../lib/auth-utils.js";
 import { scoreMatch } from "../lib/scoring.js";
+import { getChampionPickLockAt } from "./champion.js";
 import {
   FALLBACK_LIVE_WINDOW_MS,
   PREDICTION_LOCK_SETTING_KEY,
@@ -29,6 +30,10 @@ const updateScoreSchema = z.object({
 
 const updateSettingsSchema = z.object({
   predictionLockMinutes: z.number().int().min(0).max(24 * 60)
+});
+
+const updateChampionPickLockSchema = z.object({
+  lockAt: z.coerce.date()
 });
 
 export async function adminRoutes(app: FastifyInstance) {
@@ -613,6 +618,24 @@ export async function adminRoutes(app: FastifyInstance) {
   });
 
   // ─── Champion Team Management ───
+
+  app.put("/admin/champion-pick-lock", { preHandler: [app.requireAdmin] }, async (request) => {
+    const leagueId = request.leagueMember!.leagueId;
+    const { lockAt } = updateChampionPickLockSchema.parse(request.body);
+
+    const league = await prisma.league.update({
+      where: { id: leagueId },
+      data: { championPickLockAt: lockAt },
+      select: { championPickLockAt: true }
+    });
+
+    const effectiveLockAt = getChampionPickLockAt(league.championPickLockAt);
+    return {
+      lockAt: effectiveLockAt,
+      isLocked: new Date() >= effectiveLockAt,
+      message: "Đã cập nhật thời điểm khóa dự đoán đội vô địch"
+    };
+  });
 
   app.put("/admin/champion-team", { preHandler: [app.requireAdmin] }, async (request, reply) => {
     const leagueId = request.leagueMember!.leagueId;

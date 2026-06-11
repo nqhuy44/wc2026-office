@@ -2,8 +2,12 @@ import type { FastifyInstance } from "fastify";
 import z from "zod";
 import { prisma } from "../lib/prisma.js";
 
-// WC 2026 opening day — picks lock at the start of June 12
-const CHAMPION_LOCK_AT = new Date("2026-06-12T00:00:00.000Z");
+// 00:00 12/06/2026 Asia/Ho_Chi_Minh.
+export const DEFAULT_CHAMPION_PICK_LOCK_AT = new Date("2026-06-11T17:00:00.000Z");
+
+export function getChampionPickLockAt(lockAt?: Date | string | null) {
+  return lockAt ? new Date(lockAt) : DEFAULT_CHAMPION_PICK_LOCK_AT;
+}
 
 export async function championRoutes(app: FastifyInstance) {
   app.get("/teams", { preHandler: [app.requireLeagueMember] }, async () => {
@@ -16,7 +20,6 @@ export async function championRoutes(app: FastifyInstance) {
 
   app.get("/champion-pick", { preHandler: [app.requireLeagueMember] }, async (request) => {
     const { leagueId, id: memberId } = request.leagueMember!;
-    const isLocked = new Date() >= CHAMPION_LOCK_AT;
 
     const [myPick, allPicks, league] = await Promise.all([
       prisma.championPick.findUnique({
@@ -36,10 +39,12 @@ export async function championRoutes(app: FastifyInstance) {
         include: { championTeam: true }
       })
     ]);
+    const lockAt = getChampionPickLockAt(league?.championPickLockAt);
+    const isLocked = new Date() >= lockAt;
 
     return {
       isLocked,
-      lockAt: CHAMPION_LOCK_AT,
+      lockAt,
       myPick: myPick ? { teamId: myPick.teamId, team: myPick.team } : null,
       championTeam: league?.championTeam ?? null,
       allPicks: allPicks.map(p => ({
@@ -53,8 +58,13 @@ export async function championRoutes(app: FastifyInstance) {
 
   app.put("/champion-pick", { preHandler: [app.requireLeagueMember] }, async (request, reply) => {
     const { leagueId, id: memberId } = request.leagueMember!;
+    const league = await prisma.league.findUnique({
+      where: { id: leagueId },
+      select: { championPickLockAt: true }
+    });
+    const lockAt = getChampionPickLockAt(league?.championPickLockAt);
 
-    if (new Date() >= CHAMPION_LOCK_AT) {
+    if (new Date() >= lockAt) {
       return reply.status(400).send({ error: "Bad Request", code: "errChampionPickLocked" });
     }
 

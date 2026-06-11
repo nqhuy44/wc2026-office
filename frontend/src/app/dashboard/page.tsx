@@ -329,6 +329,18 @@ export default function DashboardPage() {
                   <p className="text-[12px] text-muted-foreground mt-0.5">
                     {t("championPickSub")}
                   </p>
+                  <p className="text-[12px] text-muted-foreground mt-0.5 font-semibold">
+                    {t("championPickLocksAt").replace(
+                      "{time}",
+                      new Date(champion.lockAt).toLocaleString(language === "vi" ? "vi-VN" : "en-US", {
+                        day: "2-digit",
+                        month: "2-digit",
+                        year: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit"
+                      })
+                    )}
+                  </p>
                 </div>
                 {champion.isLocked && (
                   <span className="text-[11px] font-bold px-2 py-1 rounded-full bg-gray-100 text-gray-500 border border-gray-200">

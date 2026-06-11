@@ -112,6 +112,7 @@ model League {
   slug            String         @unique
   isActive        Boolean        @default(true)
   championTeamId  String?
+  championPickLockAt DateTime?
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 

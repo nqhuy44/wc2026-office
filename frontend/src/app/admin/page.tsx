@@ -120,6 +120,13 @@ const TEAM_FLAG_FALLBACK: Record<string, string> = {
   "United States": "🇺🇸",
 };
 
+function toDatetimeLocalValue(value: string | Date) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 16);
+}
+
 function TeamLogo({ team, align = "left" }: { team: Team; align?: "left" | "right" }) {
   const fallback = TEAM_FLAG_FALLBACK[team.name] ?? team.shortName?.slice(0, 2).toUpperCase() ?? team.name.slice(0, 2).toUpperCase();
 
@@ -191,6 +198,9 @@ function AdminPageContent() {
   const [championTeam, setChampionTeam] = useState<TeamSimple | null>(null);
   const [championTeamId, setChampionTeamId] = useState<string>("");
   const [championSaving, setChampionSaving] = useState(false);
+  const [championPickLockAt, setChampionPickLockAt] = useState("");
+  const [championPickLocked, setChampionPickLocked] = useState(false);
+  const [championPickLockSaving, setChampionPickLockSaving] = useState(false);
   const [selectedPredictionMatch, setSelectedPredictionMatch] = useState<LeagueMatch | null>(null);
   const [adminPredictions, setAdminPredictions] = useState<AdminPrediction[]>([]);
   const [missingPredictionMembers, setMissingPredictionMembers] = useState<MissingPredictionMember[]>([]);
@@ -207,7 +217,7 @@ function AdminPageContent() {
         apiClient<{ participants: Participant[] }>("/admin/participants"),
         apiClient<{ matches: LeagueMatch[] }>("/matches?all=true"),
         apiClient<{ settings: AdminSettings }>("/admin/settings"),
-        apiClient<{ myPick: null; championTeam: TeamSimple | null }>("/champion-pick").catch(() => null),
+        apiClient<{ myPick: null; championTeam: TeamSimple | null; lockAt: string; isLocked: boolean }>("/champion-pick").catch(() => null),
         apiClient<{ teams: TeamSimple[] }>("/teams").catch(() => ({ teams: [] })),
       ]);
       setParticipants(partsData.participants);
@@ -217,6 +227,10 @@ function AdminPageContent() {
       if (champData?.championTeam) {
         setChampionTeam(champData.championTeam);
         setChampionTeamId(champData.championTeam.id);
+      }
+      if (champData?.lockAt) {
+        setChampionPickLockAt(toDatetimeLocalValue(champData.lockAt));
+        setChampionPickLocked(champData.isLocked);
       }
 
       // Initialize manual score inputs
@@ -371,6 +385,24 @@ function AdminPageContent() {
       alert(err.code ? t(err.code as any) : t("errUnknown"));
     } finally {
       setChampionSaving(false);
+    }
+  };
+
+  const handleSaveChampionPickLock = async (lockAtInput = championPickLockAt) => {
+    if (!lockAtInput) return;
+    setChampionPickLockSaving(true);
+    try {
+      const data = await apiClient<{ lockAt: string; isLocked: boolean; message: string }>("/admin/champion-pick-lock", {
+        method: "PUT",
+        json: { lockAt: new Date(lockAtInput).toISOString() }
+      });
+      setChampionPickLockAt(toDatetimeLocalValue(data.lockAt));
+      setChampionPickLocked(data.isLocked);
+      alert(data.message || t("adminChampionPickLockSaved"));
+    } catch (err: any) {
+      alert(err.code ? t(err.code as any) : t("errUnknown"));
+    } finally {
+      setChampionPickLockSaving(false);
     }
   };
 
@@ -1377,6 +1409,66 @@ function AdminPageContent() {
                 <CheckCircle size={14} />
                 {settingsSaving ? t("saving") : t("saveSettings")}
               </button>
+
+              {/* ─── Champion Pick Lock ─── */}
+              <div className="border-t border-border pt-5 mt-2">
+                <h4 className="text-[13px] font-extrabold text-foreground mb-1 flex items-center gap-1.5">
+                  🔒 {t("adminChampionPickLockTitle")}
+                </h4>
+                <p className="text-[12px] text-muted-foreground mb-3">{t("adminChampionPickLockSub")}</p>
+                <div className="flex flex-col sm:flex-row sm:items-end gap-3">
+                  <div className="grid gap-1.5 max-w-sm flex-1">
+                    <label className="text-[11px] font-extrabold text-muted-foreground uppercase tracking-wider">
+                      {t("adminChampionPickLockAt")}
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={championPickLockAt}
+                      onChange={(e) => setChampionPickLockAt(e.target.value)}
+                      className="w-full min-h-[40px] px-3 py-2 bg-white border border-border rounded text-foreground outline-none text-xs focus:border-primary"
+                    />
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleSaveChampionPickLock()}
+                      disabled={championPickLockSaving || !championPickLockAt}
+                      className="inline-flex items-center gap-1.5 min-h-[38px] px-4 py-2 bg-primary hover:bg-primary-strong text-white font-extrabold rounded transition-all text-[13px] disabled:opacity-50"
+                      style={{ backgroundColor: '#2F7D5C' }}
+                    >
+                      <CheckCircle size={14} />
+                      {championPickLockSaving ? t("saving") : t("adminChampionPickLockSave")}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSaveChampionPickLock(toDatetimeLocalValue(new Date()))}
+                      disabled={championPickLockSaving}
+                      className="min-h-[38px] px-4 py-2 rounded border border-amber-200 bg-amber-50 text-amber-700 text-[13px] font-extrabold disabled:opacity-50"
+                    >
+                      {t("adminChampionPickLockNow")}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const nextLock = "2026-06-27T00:00";
+                        setChampionPickLockAt(nextLock);
+                        handleSaveChampionPickLock(nextLock);
+                      }}
+                      disabled={championPickLockSaving}
+                      className="min-h-[38px] px-4 py-2 rounded border border-blue-200 bg-blue-50 text-blue-700 text-[13px] font-extrabold disabled:opacity-50"
+                    >
+                      {t("adminChampionPickReopenAfterGroups")}
+                    </button>
+                  </div>
+                </div>
+                <div className={`mt-3 inline-flex items-center px-2.5 py-0.5 rounded-full border text-[11px] font-extrabold uppercase ${
+                  championPickLocked
+                    ? "bg-amber-50 border-amber-200 text-amber-700"
+                    : "bg-green-50 border-green-200 text-green-700"
+                }`}>
+                  {championPickLocked ? t("championPickLocked") : t("predictionOpen")}
+                </div>
+              </div>
 
               {/* ─── Champion Team ─── */}
               <div className="border-t border-border pt-5 mt-2">
