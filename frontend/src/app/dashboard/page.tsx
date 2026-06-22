@@ -269,6 +269,8 @@ export default function DashboardPage() {
   const predictedMatches = matches.filter((m) => m.myPrediction && m.myPrediction.resultType !== "VOID");
   const scoredMatches = matches
     .filter((m) => m.status === "SCORED" && m.myPrediction && scoredResultTypes.includes(m.myPrediction.resultType))
+    .slice()
+    .reverse()
     .slice(0, 3);
 
   const myRank = leaderboard.findIndex((item) => item.nickname === myNickname) + 1;
@@ -541,7 +543,7 @@ export default function DashboardPage() {
                     </div>
                     <div className="flex flex-col items-end gap-1">
                       <span className={`text-[13px] font-bold px-2.5 py-0.5 rounded-md ${isExact ? 'kp-pts-exact' : isCorrect ? 'kp-pts-correct' : 'kp-pts-wrong'}`}>
-                        +{pts} {t("pointsWord")}
+                        {pts >= 0 ? '+' : ''}{pts} {t("pointsWord")}
                       </span>
                       <span className="text-[11px] text-muted-foreground font-semibold uppercase tracking-wide">
                         {isExact 

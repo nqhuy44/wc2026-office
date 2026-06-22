@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import NavigationShell from "@/components/navigation-shell";
 import { apiClient } from "@/lib/api-client";
 import { useLanguage } from "@/context/language-context";
@@ -173,8 +173,10 @@ function TeamLogo({ team, align = "left" }: { team: Team; align?: "left" | "righ
 
 function AdminPageContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const activeTab = searchParams.get("tab") || "dashboard";
   const { language, t } = useLanguage();
+  const goToTab = (tab: string) => router.push(`/admin?tab=${tab}`);
 
   const stageLabel = (stage: string, groupName: string | null): string => {
     if (stage === "GROUP") return groupName ? t("groupStageName").replace("{group}", groupName) : t("stageGroupNoLabel");
@@ -604,9 +606,12 @@ function AdminPageContent() {
                 </span>
                 <strong className="text-[28px] font-black block mt-1" style={{ color: '#E65100' }}>{needingScoring.length}</strong>
                 {discrepancies.length > 0 && (
-                  <span className="text-[11px] font-extrabold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded mt-1 inline-block">
-                    ⚠️ {discrepancies.length} tỉ số cần xác nhận
-                  </span>
+                  <button
+                    onClick={() => goToTab("results")}
+                    className="text-[11px] font-extrabold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded mt-1 inline-block hover:bg-amber-100 transition-colors cursor-pointer"
+                  >
+                    ⚠️ {discrepancies.length} tỉ số cần xác nhận →
+                  </button>
                 )}
               </article>
               <article className="bg-card border border-border rounded-lg p-5 shadow-[0_12px_30px_rgba(31,41,55,0.08)] bg-white">
@@ -1614,65 +1619,74 @@ function AdminPageContent() {
           </article>
         )}
 
-        {activeTab === "results" && discrepancies.length > 0 && (
+        {activeTab === "results" && (
           <article className="bg-white border border-amber-200 rounded-lg shadow-[0_12px_30px_rgba(31,41,55,0.08)] overflow-hidden">
             <div className="p-6 border-b border-amber-200 bg-amber-50">
               <h3 className="text-[17px] font-bold text-amber-900 mb-1 flex items-center gap-1.5">
                 ⚠️ {t("rescoreMatchTitle")}
-                <span className="ml-1 inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-600 text-white text-[11px] font-extrabold">
-                  {discrepancies.length}
-                </span>
+                {discrepancies.length > 0 && (
+                  <span className="ml-1 inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-600 text-white text-[11px] font-extrabold">
+                    {discrepancies.length}
+                  </span>
+                )}
               </h3>
               <p className="text-amber-700 text-[13px] mt-0.5">{t("rescoreMatchSub")}</p>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[700px] text-left border-collapse text-[13px]">
-                <thead>
-                  <tr className="border-b border-border bg-gray-50 text-muted-foreground font-extrabold uppercase tracking-wider text-[11px]">
-                    <th className="px-6 py-4">{t("stage")}</th>
-                    <th className="px-6 py-4">{t("matchInfo")}</th>
-                    <th className="px-6 py-4 text-center">{t("storedScoreLabel")}</th>
-                    <th className="px-6 py-4 text-center">{t("providerScoreLabel")}</th>
-                    <th className="px-6 py-4 text-right pr-8">{t("colActions")}</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {discrepancies.map((d) => (
-                    <tr key={d.matchId} className="hover:bg-amber-50/40 transition-all">
-                      <td className="px-6 py-4 text-muted-foreground font-semibold text-[11px] uppercase tracking-wider">
-                        {stageLabel(d.stage, d.groupName)}
-                      </td>
-                      <td className="px-6 py-4 font-bold text-foreground">
-                        {d.homeTeam.name} vs {d.awayTeam.name}
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <span className="inline-block px-2.5 py-1 rounded-lg bg-gray-100 font-black text-gray-500 text-[14px] line-through">
-                          {d.scoredHomeScore} - {d.scoredAwayScore}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <span className="inline-block px-2.5 py-1 rounded-lg border-2 border-amber-400 bg-amber-50 font-black text-amber-800 text-[14px]">
-                          {d.providerHomeScore} - {d.providerAwayScore}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-right pr-8">
-                        <button
-                          onClick={() => handleConfirmCorrection(d)}
-                          disabled={confirmingMatchId === d.matchId}
-                          className="min-h-[32px] px-3.5 py-1 font-extrabold rounded transition-all text-[12px] disabled:opacity-50 border border-amber-400 bg-amber-100 text-amber-900 hover:bg-amber-200"
-                        >
-                          {confirmingMatchId === d.matchId ? t("saving") : t("confirmCorrectionBtn")}
-                        </button>
-                      </td>
+            {discrepancies.length === 0 ? (
+              <div className="text-center py-10 text-muted-foreground text-[13px]">
+                ✅ {t("noScoreDiscrepancies")}
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[700px] text-left border-collapse text-[13px]">
+                  <thead>
+                    <tr className="border-b border-border bg-gray-50 text-muted-foreground font-extrabold uppercase tracking-wider text-[11px]">
+                      <th className="px-6 py-4">{t("stage")}</th>
+                      <th className="px-6 py-4">{t("matchInfo")}</th>
+                      <th className="px-6 py-4 text-center">{t("storedScoreLabel")}</th>
+                      <th className="px-6 py-4 text-center">{t("providerScoreLabel")}</th>
+                      <th className="px-6 py-4 text-right pr-8">{t("colActions")}</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {discrepancies.map((d) => (
+                      <tr key={d.matchId} className="hover:bg-amber-50/40 transition-all">
+                        <td className="px-6 py-4 text-muted-foreground font-semibold text-[11px] uppercase tracking-wider">
+                          {stageLabel(d.stage, d.groupName)}
+                        </td>
+                        <td className="px-6 py-4 font-bold text-foreground">
+                          {d.homeTeam.name} vs {d.awayTeam.name}
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <span className="inline-block px-2.5 py-1 rounded-lg bg-gray-100 font-black text-gray-500 text-[14px] line-through">
+                            {d.scoredHomeScore} - {d.scoredAwayScore}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <span className="inline-block px-2.5 py-1 rounded-lg border-2 border-amber-400 bg-amber-50 font-black text-amber-800 text-[14px]">
+                            {d.providerHomeScore} - {d.providerAwayScore}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-right pr-8">
+                          <button
+                            onClick={() => handleConfirmCorrection(d)}
+                            disabled={confirmingMatchId === d.matchId}
+                            className="min-h-[32px] px-3.5 py-1 font-extrabold rounded transition-all text-[12px] disabled:opacity-50 border border-amber-400 bg-amber-100 text-amber-900 hover:bg-amber-200"
+                          >
+                            {confirmingMatchId === d.matchId ? t("saving") : t("confirmCorrectionBtn")}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </article>
         )}
 
         {activeTab === "settings" && (
+          <>
           <article className="bg-card border border-border rounded-lg p-6 shadow-[0_12px_30px_rgba(31,41,55,0.08)] bg-white">
             <h3 className="text-[17px] font-bold text-foreground mb-4 flex items-center gap-1.5">
               <Settings size={18} className="text-primary-strong" style={{ color: '#2F7D5C' }} />
@@ -1714,11 +1728,9 @@ function AdminPageContent() {
                   onChange={(e) => setPredictionLockMinutes(Number(e.target.value))}
                   className="w-full min-h-[40px] px-3 py-2 bg-white border border-border rounded text-foreground outline-none text-xs focus:border-primary"
                 />
+                <p className="text-muted-foreground text-[12px]">{t("lockTimingHelpText")}</p>
               </div>
-              <p className="text-muted-foreground text-[12px]">
-                {t("lockTimingHelpText")}
-              </p>
-              {/* Score by extra time toggle */}
+
               <div className="flex items-start gap-3 pt-1">
                 <button
                   type="button"
@@ -1735,7 +1747,6 @@ function AdminPageContent() {
                 </div>
               </div>
 
-              {/* Hope star count */}
               <div className="grid gap-1.5 max-w-sm">
                 <label className="text-[11px] font-extrabold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                   ⭐ {t("hopeStarCountSetting")}
@@ -1755,97 +1766,98 @@ function AdminPageContent() {
                 type="button"
                 onClick={handleSaveSettings}
                 disabled={settingsSaving || !Number.isFinite(predictionLockMinutes) || predictionLockMinutes < 0}
-                className="inline-flex items-center gap-1.5 min-h-[38px] px-4 py-2 bg-primary hover:bg-primary-strong text-white font-extrabold rounded transition-all text-[13px] disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 min-h-[38px] px-4 py-2 text-white font-extrabold rounded transition-all text-[13px] disabled:opacity-50"
                 style={{ backgroundColor: '#2F7D5C' }}
               >
                 <CheckCircle size={14} />
                 {settingsSaving ? t("saving") : t("saveSettings")}
               </button>
-
-              {/* ─── Champion Pick Lock ─── */}
-              <div className="border-t border-border pt-5 mt-2">
-                <h4 className="text-[13px] font-extrabold text-foreground mb-1 flex items-center gap-1.5">
-                  🔒 {t("adminChampionPickLockTitle")}
-                </h4>
-                <p className="text-[12px] text-muted-foreground mb-3">{t("adminChampionPickLockSub")}</p>
-                <div className="flex flex-col sm:flex-row sm:items-end gap-3">
-                  <div className="grid gap-1.5 max-w-sm flex-1">
-                    <label className="text-[11px] font-extrabold text-muted-foreground uppercase tracking-wider">
-                      {t("adminChampionPickLockAt")}
-                    </label>
-                    <input
-                      type="datetime-local"
-                      value={championPickLockAt}
-                      onChange={(e) => setChampionPickLockAt(e.target.value)}
-                      className="w-full min-h-[40px] px-3 py-2 bg-white border border-border rounded text-foreground outline-none text-xs focus:border-primary"
-                    />
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleSaveChampionPickLock()}
-                      disabled={championPickLockSaving || !championPickLockAt}
-                      className="inline-flex items-center gap-1.5 min-h-[38px] px-4 py-2 bg-primary hover:bg-primary-strong text-white font-extrabold rounded transition-all text-[13px] disabled:opacity-50"
-                      style={{ backgroundColor: '#2F7D5C' }}
-                    >
-                      <CheckCircle size={14} />
-                      {championPickLockSaving ? t("saving") : t("adminChampionPickLockSave")}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleSaveChampionPickLock(toDatetimeLocalValue(new Date()))}
-                      disabled={championPickLockSaving}
-                      className="min-h-[38px] px-4 py-2 rounded border border-amber-200 bg-amber-50 text-amber-700 text-[13px] font-extrabold disabled:opacity-50"
-                    >
-                      {t("adminChampionPickLockNow")}
-                    </button>
-                  </div>
-                </div>
-                <div className={`mt-3 inline-flex items-center px-2.5 py-0.5 rounded-full border text-[11px] font-extrabold uppercase ${
-                  championPickLocked
-                    ? "bg-amber-50 border-amber-200 text-amber-700"
-                    : "bg-green-50 border-green-200 text-green-700"
-                }`}>
-                  {championPickLocked ? t("championPickLocked") : t("predictionOpen")}
-                </div>
-              </div>
-
-              {/* ─── Champion Team ─── */}
-              <div className="border-t border-border pt-5 mt-2">
-                <h4 className="text-[13px] font-extrabold text-foreground mb-1 flex items-center gap-1.5">
-                  🏆 {t("adminSetChampion")}
-                </h4>
-                <p className="text-[12px] text-muted-foreground mb-3">{t("adminSetChampionSub")}</p>
-                {championTeam && (
-                  <div className="flex items-center gap-2 mb-3 text-[13px] font-bold" style={{ color: '#F57F17' }}>
-                    {championTeam.flagUrl && <img src={championTeam.flagUrl} alt="" className="w-5 h-5 object-contain" />}
-                    {t("championPickConfirmed")}: {championTeam.name}
-                  </div>
-                )}
-                <div className="flex items-center gap-2 max-w-sm">
-                  <select
-                    value={championTeamId}
-                    onChange={(e) => setChampionTeamId(e.target.value)}
-                    className="flex-1 min-h-[36px] px-3 py-1.5 border border-border rounded-lg text-[13px] font-semibold bg-white focus:outline-none focus:border-primary"
-                  >
-                    <option value="">{t("adminChampionNone")}</option>
-                    {allTeams.map(team => (
-                      <option key={team.id} value={team.id}>{team.name}</option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    onClick={handleSaveChampionTeam}
-                    disabled={championSaving}
-                    className="min-h-[36px] px-4 py-1.5 rounded-lg text-[13px] font-bold text-white disabled:opacity-50"
-                    style={{ background: 'linear-gradient(135deg, #F57F17, #E65100)' }}
-                  >
-                    {championSaving ? t("saving") : t("adminChampionSave")}
-                  </button>
-                </div>
-              </div>
             </div>
           </article>
+
+          {/* ─── Champion Pick Lock ─── */}
+          <article className="bg-card border border-border rounded-lg p-6 shadow-[0_12px_30px_rgba(31,41,55,0.08)] bg-white">
+            <h4 className="text-[15px] font-bold text-foreground mb-1 flex items-center gap-1.5">
+              🔒 {t("adminChampionPickLockTitle")}
+            </h4>
+            <p className="text-[12px] text-muted-foreground mb-4">{t("adminChampionPickLockSub")}</p>
+            <div className="flex flex-col sm:flex-row sm:items-end gap-3">
+              <div className="grid gap-1.5 max-w-sm flex-1">
+                <label className="text-[11px] font-extrabold text-muted-foreground uppercase tracking-wider">
+                  {t("adminChampionPickLockAt")}
+                </label>
+                <input
+                  type="datetime-local"
+                  value={championPickLockAt}
+                  onChange={(e) => setChampionPickLockAt(e.target.value)}
+                  className="w-full min-h-[40px] px-3 py-2 bg-white border border-border rounded text-foreground outline-none text-xs focus:border-primary"
+                />
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleSaveChampionPickLock()}
+                  disabled={championPickLockSaving || !championPickLockAt}
+                  className="inline-flex items-center gap-1.5 min-h-[38px] px-4 py-2 text-white font-extrabold rounded transition-all text-[13px] disabled:opacity-50"
+                  style={{ backgroundColor: '#2F7D5C' }}
+                >
+                  <CheckCircle size={14} />
+                  {championPickLockSaving ? t("saving") : t("adminChampionPickLockSave")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSaveChampionPickLock(toDatetimeLocalValue(new Date()))}
+                  disabled={championPickLockSaving}
+                  className="min-h-[38px] px-4 py-2 rounded border border-amber-200 bg-amber-50 text-amber-700 text-[13px] font-extrabold disabled:opacity-50"
+                >
+                  {t("adminChampionPickLockNow")}
+                </button>
+              </div>
+            </div>
+            <div className={`mt-3 inline-flex items-center px-2.5 py-0.5 rounded-full border text-[11px] font-extrabold uppercase ${
+              championPickLocked
+                ? "bg-amber-50 border-amber-200 text-amber-700"
+                : "bg-green-50 border-green-200 text-green-700"
+            }`}>
+              {championPickLocked ? t("championPickLocked") : t("predictionOpen")}
+            </div>
+          </article>
+
+          {/* ─── Champion Team ─── */}
+          <article className="bg-card border border-border rounded-lg p-6 shadow-[0_12px_30px_rgba(31,41,55,0.08)] bg-white">
+            <h4 className="text-[15px] font-bold text-foreground mb-1 flex items-center gap-1.5">
+              🏆 {t("adminSetChampion")}
+            </h4>
+            <p className="text-[12px] text-muted-foreground mb-4">{t("adminSetChampionSub")}</p>
+            {championTeam && (
+              <div className="flex items-center gap-2 mb-3 text-[13px] font-bold" style={{ color: '#F57F17' }}>
+                {championTeam.flagUrl && <img src={championTeam.flagUrl} alt="" className="w-5 h-5 object-contain" />}
+                {t("championPickConfirmed")}: {championTeam.name}
+              </div>
+            )}
+            <div className="flex items-center gap-2 max-w-sm">
+              <select
+                value={championTeamId}
+                onChange={(e) => setChampionTeamId(e.target.value)}
+                className="flex-1 min-h-[36px] px-3 py-1.5 border border-border rounded-lg text-[13px] font-semibold bg-white focus:outline-none focus:border-primary"
+              >
+                <option value="">{t("adminChampionNone")}</option>
+                {allTeams.map(team => (
+                  <option key={team.id} value={team.id}>{team.name}</option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={handleSaveChampionTeam}
+                disabled={championSaving}
+                className="min-h-[36px] px-4 py-1.5 rounded-lg text-[13px] font-bold text-white disabled:opacity-50"
+                style={{ background: 'linear-gradient(135deg, #F57F17, #E65100)' }}
+              >
+                {championSaving ? t("saving") : t("adminChampionSave")}
+              </button>
+            </div>
+          </article>
+          </>
         )}
 
         {activeTab === "exports" && (

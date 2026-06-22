@@ -23,6 +23,7 @@ export const en = {
   leaderboard: "Leaderboard",
   predictions: "My Predictions",
   adminPredictions: "Predictions",
+  adminResults: "Scores",
   adminDashboard: "Admin Panel",
   players: "Players",
   settings: "Settings",

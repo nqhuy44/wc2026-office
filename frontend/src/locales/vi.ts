@@ -23,6 +23,7 @@ export const vi = {
   leaderboard: "Bảng điểm",
   predictions: "Dự đoán của tôi",
   adminPredictions: "Dự đoán",
+  adminResults: "Tỉ số",
   adminDashboard: "Quản lý giải",
   players: "Thành viên",
   settings: "Cài đặt",
