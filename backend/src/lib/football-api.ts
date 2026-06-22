@@ -62,10 +62,38 @@ function mapStage(apiStage: string): any {
   }
 }
 
-function getScoreValue(score: any, side: "home" | "away") {
-  const periods = [score?.fullTime, score?.regularTime, score?.halfTime];
-  const period = periods.find((p) => typeof p?.[side] === "number");
-  return period?.[side] ?? null;
+// Extract the 90-minute score. For REGULAR matches fullTime = 90min.
+// For EXTRA_TIME/PENALTY_SHOOTOUT the API provides regularTime = 90min separately.
+function getRegularTimeScore(score: any, side: "home" | "away"): number | null {
+  const duration: string = score?.duration ?? "REGULAR";
+  if (duration === "EXTRA_TIME" || duration === "PENALTY_SHOOTOUT") {
+    return score?.regularTime?.[side] ?? null;
+  }
+  return score?.fullTime?.[side] ?? null;
+}
+
+// Extract all period-specific scores from the provider response.
+function extractPeriodScores(score: any) {
+  const duration: string = score?.duration ?? "REGULAR";
+  const regularTimeHome = getRegularTimeScore(score, "home");
+  const regularTimeAway = getRegularTimeScore(score, "away");
+
+  let extraTimeHome: number | null = null;
+  let extraTimeAway: number | null = null;
+  let penaltiesHome: number | null = null;
+  let penaltiesAway: number | null = null;
+
+  if (duration === "EXTRA_TIME" || duration === "PENALTY_SHOOTOUT") {
+    // extraTime from the API is the cumulative score at end of ET
+    extraTimeHome = score?.extraTime?.home ?? null;
+    extraTimeAway = score?.extraTime?.away ?? null;
+  }
+  if (duration === "PENALTY_SHOOTOUT") {
+    penaltiesHome = score?.penalties?.home ?? null;
+    penaltiesAway = score?.penalties?.away ?? null;
+  }
+
+  return { duration, regularTimeHome, regularTimeAway, extraTimeHome, extraTimeAway, penaltiesHome, penaltiesAway };
 }
 
 export async function fetchWorldCupMatches() {
@@ -135,8 +163,7 @@ export async function fetchWorldCupMatches() {
 
         if (!homeTeamRecord || !awayTeamRecord) continue;
 
-        const homeScore = getScoreValue(m.score, "home");
-        const awayScore = getScoreValue(m.score, "away");
+        const periods = extractPeriodScores(m.score);
         const newStatus = mapStatus(m.status);
 
         const existingMatch = await prisma.match.findUnique({
@@ -150,10 +177,24 @@ export async function fetchWorldCupMatches() {
             kickoffAt: new Date(m.utcDate),
             stage: mapStage(m.stage),
             groupName: m.group ? m.group.replace('GROUP_', '') : null,
-            // Preserve SCORED status — don't let API override it with LIVE/FINISHED/etc.
+            // Preserve SCORED status — don't let API override it.
             status: alreadyScored ? 'SCORED' : newStatus,
-            // Don't overwrite manually-entered scores for already-scored matches
-            ...(alreadyScored ? {} : { homeScore, awayScore }),
+            // Always update period breakdown so admin can see the full picture.
+            duration: periods.duration,
+            regularTimeHome: periods.regularTimeHome,
+            regularTimeAway: periods.regularTimeAway,
+            extraTimeHome: periods.extraTimeHome,
+            extraTimeAway: periods.extraTimeAway,
+            penaltiesHome: periods.penaltiesHome,
+            penaltiesAway: periods.penaltiesAway,
+            // providerHomeScore/Away = 90-min score for discrepancy detection.
+            providerHomeScore: periods.regularTimeHome,
+            providerAwayScore: periods.regularTimeAway,
+            // homeScore/awayScore = 90-min score, only written on first sync.
+            ...(alreadyScored ? {} : {
+              homeScore: periods.regularTimeHome,
+              awayScore: periods.regularTimeAway,
+            }),
           },
           create: {
             externalMatchId: String(m.id),
@@ -163,14 +204,22 @@ export async function fetchWorldCupMatches() {
             stage: mapStage(m.stage),
             groupName: m.group ? m.group.replace('GROUP_', '') : null,
             status: newStatus,
-            homeScore: homeScore,
-            awayScore: awayScore,
+            homeScore: periods.regularTimeHome,
+            awayScore: periods.regularTimeAway,
+            regularTimeHome: periods.regularTimeHome,
+            regularTimeAway: periods.regularTimeAway,
+            extraTimeHome: periods.extraTimeHome,
+            extraTimeAway: periods.extraTimeAway,
+            penaltiesHome: periods.penaltiesHome,
+            penaltiesAway: periods.penaltiesAway,
+            duration: periods.duration,
+            providerHomeScore: periods.regularTimeHome,
+            providerAwayScore: periods.regularTimeAway,
           }
         });
 
-        // If score changed and status is FINISHED or LIVE, trigger scoring
-        if (newStatus === 'FINISHED' && homeScore !== null && awayScore !== null && matchRecord.status !== 'SCORED') {
-          // Trận đấu vừa xong và có tỉ số, tự động chấm điểm!
+        // Auto-score when provider marks FINISHED and 90-min score is available.
+        if (newStatus === 'FINISHED' && periods.regularTimeHome !== null && periods.regularTimeAway !== null && matchRecord.status !== 'SCORED') {
           await scoreMatch(matchRecord.id);
         }
       }

@@ -7,6 +7,8 @@ import { getChampionPickLockAt } from "./champion.js";
 import {
   FALLBACK_LIVE_WINDOW_MS,
   PREDICTION_LOCK_SETTING_KEY,
+  SCORE_BY_EXTRA_TIME_SETTING_KEY,
+  HOPE_STAR_COUNT_SETTING_KEY,
   getLeagueLockAt,
   getLeaguePredictionLockMinutes,
   getLockAt,
@@ -24,12 +26,19 @@ const updateMemberRoleSchema = z.object({
 });
 
 const updateScoreSchema = z.object({
-  homeScore: z.number().min(0),
-  awayScore: z.number().min(0),
+  homeScore: z.number().int().min(0),      // 90-min score
+  awayScore: z.number().int().min(0),
+  duration: z.enum(["REGULAR", "EXTRA_TIME", "PENALTY_SHOOTOUT"]).default("REGULAR"),
+  extraTimeHome: z.number().int().min(0).optional(),
+  extraTimeAway: z.number().int().min(0).optional(),
+  penaltiesHome: z.number().int().min(0).optional(),
+  penaltiesAway: z.number().int().min(0).optional(),
 });
 
 const updateSettingsSchema = z.object({
-  predictionLockMinutes: z.number().int().min(0).max(24 * 60)
+  predictionLockMinutes: z.number().int().min(0).max(24 * 60),
+  scoreByExtraTime: z.boolean().optional(),
+  hopeStarCount: z.number().int().min(0).max(20).optional(),
 });
 
 const updateChampionPickLockSchema = z.object({
@@ -500,7 +509,7 @@ export async function adminRoutes(app: FastifyInstance) {
 
   app.put("/admin/matches/:matchId/score", { preHandler: [app.requireAdmin] }, async (request, reply) => {
     const { matchId } = request.params as { matchId: string };
-    const { homeScore, awayScore } = updateScoreSchema.parse(request.body);
+    const { homeScore, awayScore, duration, extraTimeHome, extraTimeAway, penaltiesHome, penaltiesAway } = updateScoreSchema.parse(request.body);
     const leagueId = request.leagueMember!.leagueId;
 
     await refreshLeagueMatchStatuses(leagueId);
@@ -545,7 +554,17 @@ export async function adminRoutes(app: FastifyInstance) {
 
     const match = await prisma.match.update({
       where: { id: matchId },
-      data: { homeScore, awayScore }
+      data: {
+        homeScore,
+        awayScore,
+        regularTimeHome: homeScore,
+        regularTimeAway: awayScore,
+        duration,
+        extraTimeHome: extraTimeHome ?? null,
+        extraTimeAway: extraTimeAway ?? null,
+        penaltiesHome: penaltiesHome ?? null,
+        penaltiesAway: penaltiesAway ?? null,
+      }
     });
 
     await scoreMatch(match.id);
@@ -553,40 +572,173 @@ export async function adminRoutes(app: FastifyInstance) {
     return { match, message: "Đã cập nhật tỉ số và chấm điểm thành công!" };
   });
 
+  // Returns SCORED matches where provider score now differs from the scored score.
+  // Admin must confirm these before re-scoring is applied.
+  app.get("/admin/score-discrepancies", { preHandler: [app.requireAdmin] }, async (request) => {
+    const leagueId = request.leagueMember!.leagueId;
+
+    const leagueMatches = await prisma.leagueMatch.findMany({
+      where: {
+        leagueId,
+        status: "SCORED",
+        isPredictionEnabled: true,
+        match: {
+          providerHomeScore: { not: null },
+          providerAwayScore: { not: null },
+        }
+      },
+      include: {
+        match: {
+          include: { homeTeam: true, awayTeam: true }
+        }
+      }
+    });
+
+    const discrepancies = leagueMatches
+      .filter(lm =>
+        lm.match.providerHomeScore !== null &&
+        lm.match.providerAwayScore !== null &&
+        (lm.match.providerHomeScore !== lm.match.homeScore ||
+          lm.match.providerAwayScore !== lm.match.awayScore)
+      )
+      .map(lm => ({
+        leagueMatchId: lm.id,
+        matchId: lm.match.id,
+        stage: lm.match.stage,
+        groupName: lm.match.groupName,
+        kickoffAt: lm.match.kickoffAt,
+        homeTeam: { name: lm.match.homeTeam.name, flagUrl: lm.match.homeTeam.flagUrl },
+        awayTeam: { name: lm.match.awayTeam.name, flagUrl: lm.match.awayTeam.flagUrl },
+        scoredHomeScore: lm.match.homeScore,
+        scoredAwayScore: lm.match.awayScore,
+        providerHomeScore: lm.match.providerHomeScore,
+        providerAwayScore: lm.match.providerAwayScore,
+      }));
+
+    return { discrepancies };
+  });
+
+  // Confirm a score correction: applies providerHomeScore/providerAwayScore to the match
+  // and re-scores all non-VOID predictions. Admin cannot enter arbitrary scores here.
+  app.put("/admin/matches/:matchId/rescore", { preHandler: [app.requireAdmin] }, async (request, reply) => {
+    const { matchId } = request.params as { matchId: string };
+    const leagueId = request.leagueMember!.leagueId;
+
+    const leagueMatch = await prisma.leagueMatch.findFirst({
+      where: { leagueId, matchId },
+      include: { match: true }
+    });
+
+    if (!leagueMatch) {
+      return reply.status(404).send({ error: "Not Found", code: "errMatchNotFound" });
+    }
+
+    if (!leagueMatch.isPredictionEnabled) {
+      return reply.status(400).send({ error: "Bad Request", code: "errManualScoreRequiresPredictionMatch" });
+    }
+
+    if (leagueMatch.match.status !== "SCORED") {
+      return reply.status(400).send({ error: "Bad Request", code: "errMatchNotScored" });
+    }
+
+    const { providerHomeScore, providerAwayScore } = leagueMatch.match;
+
+    if (providerHomeScore === null || providerAwayScore === null) {
+      return reply.status(400).send({ error: "Bad Request", code: "errNoProviderScore" });
+    }
+
+    if (providerHomeScore === leagueMatch.match.homeScore && providerAwayScore === leagueMatch.match.awayScore) {
+      return reply.status(400).send({ error: "Bad Request", code: "errScoreAlreadyMatches" });
+    }
+
+    await prisma.match.update({
+      where: { id: matchId },
+      data: { homeScore: providerHomeScore, awayScore: providerAwayScore }
+    });
+
+    await scoreMatch(matchId);
+
+    return { message: "Đã xác nhận sửa tỉ số và chấm điểm lại thành công!" };
+  });
+
+  // ─── Point Multiplier (x2 for knockout matches) ───
+
+  app.put("/admin/league-matches/:leagueMatchId/point-multiplier", { preHandler: [app.requireAdmin] }, async (request, reply) => {
+    const { leagueMatchId } = request.params as { leagueMatchId: string };
+    const leagueId = request.leagueMember!.leagueId;
+    const { multiplier } = z.object({ multiplier: z.number().int().min(1).max(3) }).parse(request.body);
+
+    const leagueMatch = await prisma.leagueMatch.findFirst({
+      where: { id: leagueMatchId, leagueId },
+      include: { match: { select: { stage: true } } }
+    });
+
+    if (!leagueMatch) {
+      return reply.status(404).send({ error: "Not Found", code: "errMatchNotFound" });
+    }
+
+    const KNOCKOUT_STAGES = ["ROUND_OF_32", "ROUND_OF_16", "QUARTER_FINAL", "SEMI_FINAL", "THIRD_PLACE", "FINAL"];
+    if (!KNOCKOUT_STAGES.includes(leagueMatch.match.stage)) {
+      return reply.status(400).send({ error: "Bad Request", code: "errNotKnockoutMatch" });
+    }
+
+    const updated = await prisma.leagueMatch.update({
+      where: { id: leagueMatchId },
+      data: { pointMultiplier: multiplier }
+    });
+
+    return { leagueMatch: updated, message: `Đã cập nhật hệ số điểm x${multiplier}` };
+  });
+
   // ─── Settings Management ───
-  
+
   app.get("/admin/settings", { preHandler: [app.requireAdmin] }, async (request) => {
     const leagueId = request.leagueMember!.leagueId;
-    const predictionLockMinutes = await getLeaguePredictionLockMinutes(leagueId);
+    const [predictionLockMinutes, scoreByExtraTimeSetting, hopeStarSetting] = await Promise.all([
+      getLeaguePredictionLockMinutes(leagueId),
+      prisma.appSetting.findUnique({
+        where: { leagueId_key: { leagueId, key: SCORE_BY_EXTRA_TIME_SETTING_KEY } }
+      }),
+      prisma.appSetting.findUnique({
+        where: { leagueId_key: { leagueId, key: HOPE_STAR_COUNT_SETTING_KEY } }
+      })
+    ]);
 
     return {
       settings: {
-        predictionLockMinutes
+        predictionLockMinutes,
+        scoreByExtraTime: scoreByExtraTimeSetting?.value === true,
+        hopeStarCount: typeof hopeStarSetting?.value === "number" ? Math.trunc(hopeStarSetting.value as number) : 0,
       }
     };
   });
 
   app.put("/admin/settings", { preHandler: [app.requireAdmin] }, async (request) => {
     const leagueId = request.leagueMember!.leagueId;
-    const { predictionLockMinutes } = updateSettingsSchema.parse(request.body);
+    const { predictionLockMinutes, scoreByExtraTime, hopeStarCount } = updateSettingsSchema.parse(request.body);
 
     await prisma.$transaction(async (tx) => {
       await tx.appSetting.upsert({
-        where: {
-          leagueId_key: {
-            leagueId,
-            key: PREDICTION_LOCK_SETTING_KEY
-          }
-        },
-        update: {
-          value: predictionLockMinutes
-        },
-        create: {
-          leagueId,
-          key: PREDICTION_LOCK_SETTING_KEY,
-          value: predictionLockMinutes
-        }
+        where: { leagueId_key: { leagueId, key: PREDICTION_LOCK_SETTING_KEY } },
+        update: { value: predictionLockMinutes },
+        create: { leagueId, key: PREDICTION_LOCK_SETTING_KEY, value: predictionLockMinutes }
       });
+
+      if (scoreByExtraTime !== undefined) {
+        await tx.appSetting.upsert({
+          where: { leagueId_key: { leagueId, key: SCORE_BY_EXTRA_TIME_SETTING_KEY } },
+          update: { value: scoreByExtraTime },
+          create: { leagueId, key: SCORE_BY_EXTRA_TIME_SETTING_KEY, value: scoreByExtraTime }
+        });
+      }
+
+      if (hopeStarCount !== undefined) {
+        await tx.appSetting.upsert({
+          where: { leagueId_key: { leagueId, key: HOPE_STAR_COUNT_SETTING_KEY } },
+          update: { value: hopeStarCount },
+          create: { leagueId, key: HOPE_STAR_COUNT_SETTING_KEY, value: hopeStarCount }
+        });
+      }
 
       const openMatches = await tx.leagueMatch.findMany({
         where: {
@@ -611,7 +763,9 @@ export async function adminRoutes(app: FastifyInstance) {
 
     return {
       settings: {
-        predictionLockMinutes
+        predictionLockMinutes,
+        scoreByExtraTime: scoreByExtraTime ?? false,
+        hopeStarCount: hopeStarCount ?? 0,
       },
       message: "Đã cập nhật cài đặt"
     };

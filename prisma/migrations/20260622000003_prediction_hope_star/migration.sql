@@ -1,0 +1,1 @@
+ALTER TABLE "Prediction" ADD COLUMN "isHopeStar" BOOLEAN NOT NULL DEFAULT false;

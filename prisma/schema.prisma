@@ -179,8 +179,17 @@ model Match {
   groupName       String?
   venue           String?
   status          MatchStatus  @default(SCHEDULED)
-  homeScore       Int?
-  awayScore       Int?
+  homeScore            Int?         // 90-min score (regularTime); used for prediction scoring
+  awayScore            Int?
+  regularTimeHome      Int?         // Raw 90-min score from provider (same as homeScore after sync)
+  regularTimeAway      Int?
+  extraTimeHome        Int?         // Cumulative score at end of ET (null if no ET)
+  extraTimeAway        Int?
+  penaltiesHome        Int?         // Penalty shootout goals (not cumulative)
+  penaltiesAway        Int?
+  duration             String?      // REGULAR | EXTRA_TIME | PENALTY_SHOOTOUT
+  providerHomeScore    Int?         // Latest 90-min score from provider (for discrepancy detection)
+  providerAwayScore    Int?
   winner          MatchWinner  @default(UNKNOWN)
   resultSource    String?
   scoredAt        DateTime?
@@ -201,6 +210,7 @@ model LeagueMatch {
   matchId             String
   status              MatchStatus  @default(SCHEDULED)
   isPredictionEnabled Boolean      @default(false)
+  pointMultiplier     Int          @default(1)
   lockAt              DateTime?
   openedAt            DateTime?
   createdAt           DateTime     @default(now())
@@ -221,6 +231,7 @@ model Prediction {
   memberId         String               // Linked to LeagueMember
   homeScorePred    Int
   awayScorePred    Int
+  isHopeStar       Boolean              @default(false)
   points           Int                  @default(0)
   resultType       PredictionResultType @default(PENDING)
   lockedSnapshotAt DateTime?

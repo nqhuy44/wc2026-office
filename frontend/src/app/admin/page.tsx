@@ -58,12 +58,15 @@ interface LeagueMatch {
   id: string;
   status: string;
   isPredictionEnabled: boolean;
+  pointMultiplier: number;
   lockAt: string | null;
   match: Match;
 }
 
 interface AdminSettings {
   predictionLockMinutes: number;
+  scoreByExtraTime: boolean;
+  hopeStarCount: number;
 }
 
 interface TeamSimple {
@@ -87,6 +90,20 @@ interface AdminPrediction {
     username: string;
     displayName: string;
   };
+}
+
+interface Discrepancy {
+  leagueMatchId: string;
+  matchId: string;
+  stage: string;
+  groupName: string | null;
+  kickoffAt: string;
+  homeTeam: { name: string; flagUrl: string | null };
+  awayTeam: { name: string; flagUrl: string | null };
+  scoredHomeScore: number;
+  scoredAwayScore: number;
+  providerHomeScore: number;
+  providerAwayScore: number;
 }
 
 interface MissingPredictionMember {
@@ -170,6 +187,26 @@ function AdminPageContent() {
     return stage;
   };
 
+  const KNOCKOUT_STAGES = ["ROUND_OF_32", "ROUND_OF_16", "QUARTER_FINAL", "SEMI_FINAL", "THIRD_PLACE", "FINAL"];
+  const isKnockout = (stage: string) => KNOCKOUT_STAGES.includes(stage);
+
+  const handleSetMultiplier = async (leagueMatchId: string, multiplier: number) => {
+    setSettingMultiplierId(leagueMatchId);
+    try {
+      await apiClient<{ leagueMatch: LeagueMatch }>(`/admin/league-matches/${leagueMatchId}/point-multiplier`, {
+        method: "PUT",
+        json: { multiplier },
+      });
+      setMatches((prev) =>
+        prev.map((m) => m.id === leagueMatchId ? { ...m, pointMultiplier: multiplier } : m)
+      );
+    } catch (err: any) {
+      alert(err.code ? t(err.code as any) : t("errUnknown"));
+    } finally {
+      setSettingMultiplierId(null);
+    }
+  };
+
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [matches, setMatches] = useState<LeagueMatch[]>([]);
   const [loading, setLoading] = useState(true);
@@ -185,14 +222,24 @@ function AdminPageContent() {
   const [creating, setCreating] = useState(false);
 
   // Manual score input state
-  const [scoreState, setScoreState] = useState<Record<string, { home: number | ""; away: number | "" }>>({});
+  const [scoreState, setScoreState] = useState<Record<string, {
+    home: number | ""; away: number | "";
+    duration: "REGULAR" | "EXTRA_TIME" | "PENALTY_SHOOTOUT";
+    etHome: number | ""; etAway: number | "";
+    penHome: number | ""; penAway: number | "";
+  }>>({});
   const [scoringId, setScoringId] = useState<string | null>(null);
+  const [discrepancies, setDiscrepancies] = useState<Discrepancy[]>([]);
+  const [confirmingMatchId, setConfirmingMatchId] = useState<string | null>(null);
 
   // Match management state
   const [matchFilter, setMatchFilter] = useState<"all" | "open" | "closed" | "done">("all");
   const [matchSearchQuery, setMatchSearchQuery] = useState("");
   const [togglingMatchId, setTogglingMatchId] = useState<string | null>(null);
+  const [settingMultiplierId, setSettingMultiplierId] = useState<string | null>(null);
   const [predictionLockMinutes, setPredictionLockMinutes] = useState(15);
+  const [scoreByExtraTime, setScoreByExtraTime] = useState(false);
+  const [hopeStarCount, setHopeStarCount] = useState(0);
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [allTeams, setAllTeams] = useState<TeamSimple[]>([]);
   const [championTeam, setChampionTeam] = useState<TeamSimple | null>(null);
@@ -213,17 +260,21 @@ function AdminPageContent() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [partsData, matchesData, settingsData, champData, teamsData] = await Promise.all([
+      const [partsData, matchesData, settingsData, champData, teamsData, discData] = await Promise.all([
         apiClient<{ participants: Participant[] }>("/admin/participants"),
         apiClient<{ matches: LeagueMatch[] }>("/matches?all=true"),
         apiClient<{ settings: AdminSettings }>("/admin/settings"),
         apiClient<{ myPick: null; championTeam: TeamSimple | null; lockAt: string; isLocked: boolean }>("/champion-pick").catch(() => null),
         apiClient<{ teams: TeamSimple[] }>("/teams").catch(() => ({ teams: [] })),
+        apiClient<{ discrepancies: Discrepancy[] }>("/admin/score-discrepancies").catch(() => ({ discrepancies: [] })),
       ]);
       setParticipants(partsData.participants);
       setMatches(matchesData.matches);
       setPredictionLockMinutes(settingsData.settings.predictionLockMinutes);
+      setScoreByExtraTime(settingsData.settings.scoreByExtraTime ?? false);
+      setHopeStarCount(settingsData.settings.hopeStarCount ?? 0);
       setAllTeams(teamsData.teams);
+      setDiscrepancies(discData.discrepancies);
       if (champData?.championTeam) {
         setChampionTeam(champData.championTeam);
         setChampionTeamId(champData.championTeam.id);
@@ -234,11 +285,14 @@ function AdminPageContent() {
       }
 
       // Initialize manual score inputs
-      const initialScores: Record<string, { home: number | ""; away: number | "" }> = {};
+      const initialScores: typeof scoreState = {};
       matchesData.matches.forEach((lm) => {
         initialScores[lm.match.id] = {
           home: lm.match.homeScore ?? "",
           away: lm.match.awayScore ?? "",
+          duration: "REGULAR",
+          etHome: "", etAway: "",
+          penHome: "", penAway: "",
         };
       });
       setScoreState(initialScores);
@@ -340,12 +394,12 @@ function AdminPageContent() {
     }
   };
 
-  const handleScoreChange = (matchId: string, side: "home" | "away", value: string) => {
+  const handleScoreChange = (matchId: string, field: string, value: string) => {
     setScoreState((prev) => ({
       ...prev,
       [matchId]: {
         ...prev[matchId],
-        [side]: value === "" ? "" : Number(value),
+        [field]: field === "duration" ? value : (value === "" ? "" : Number(value)),
       },
     }));
   };
@@ -354,21 +408,51 @@ function AdminPageContent() {
     const vals = scoreState[matchId];
     if (!vals || vals.home === "" || vals.away === "") return;
 
+    const body: Record<string, unknown> = {
+      homeScore: Number(vals.home),
+      awayScore: Number(vals.away),
+      duration: vals.duration,
+    };
+    if (vals.duration !== "REGULAR") {
+      if (vals.etHome !== "" && vals.etAway !== "") {
+        body.extraTimeHome = Number(vals.etHome);
+        body.extraTimeAway = Number(vals.etAway);
+      }
+    }
+    if (vals.duration === "PENALTY_SHOOTOUT") {
+      if (vals.penHome !== "" && vals.penAway !== "") {
+        body.penaltiesHome = Number(vals.penHome);
+        body.penaltiesAway = Number(vals.penAway);
+      }
+    }
+
     setScoringId(matchId);
     try {
-      await apiClient<{ message: string }>(`/admin/matches/${matchId}/score`, {
-        method: "PUT",
-        json: {
-          homeScore: Number(vals.home),
-          awayScore: Number(vals.away),
-        },
-      });
+      await apiClient<{ message: string }>(`/admin/matches/${matchId}/score`, { method: "PUT", json: body });
       alert(t("scoreSubmitted"));
-      loadData(); // Reload to refresh statuses
+      loadData();
     } catch (err: any) {
       alert(err.code ? t(err.code as any) : t("errUnknown"));
     } finally {
       setScoringId(null);
+    }
+  };
+
+  const handleConfirmCorrection = async (d: Discrepancy) => {
+    const oldScore = `${d.scoredHomeScore}-${d.scoredAwayScore}`;
+    const newScore = `${d.providerHomeScore}-${d.providerAwayScore}`;
+    const msg = t("rescoreConfirm").replace("{old}", oldScore).replace("{new}", newScore);
+    if (!confirm(msg)) return;
+
+    setConfirmingMatchId(d.matchId);
+    try {
+      await apiClient<{ message: string }>(`/admin/matches/${d.matchId}/rescore`, { method: "PUT" });
+      alert(t("rescoreSuccess"));
+      loadData();
+    } catch (err: any) {
+      alert(err.code ? t(err.code as any) : t("errUnknown"));
+    } finally {
+      setConfirmingMatchId(null);
     }
   };
 
@@ -412,10 +496,14 @@ function AdminPageContent() {
       const data = await apiClient<{ settings: AdminSettings; message: string }>("/admin/settings", {
         method: "PUT",
         json: {
-          predictionLockMinutes: Number(predictionLockMinutes)
+          predictionLockMinutes: Number(predictionLockMinutes),
+          scoreByExtraTime,
+          hopeStarCount: Number(hopeStarCount),
         }
       });
       setPredictionLockMinutes(data.settings.predictionLockMinutes);
+      setScoreByExtraTime(data.settings.scoreByExtraTime ?? false);
+      setHopeStarCount(data.settings.hopeStarCount ?? 0);
       alert(data.message || t("settingsSaved"));
       await loadData();
     } catch (err: any) {
@@ -514,7 +602,12 @@ function AdminPageContent() {
                 <span className="text-muted-foreground text-[13px] block">
                   {t("needResult")}
                 </span>
-                <strong className="text-[28px] font-black block mt-1 text-accent" style={{ color: '#E65100' }}>{needingScoring.length}</strong>
+                <strong className="text-[28px] font-black block mt-1" style={{ color: '#E65100' }}>{needingScoring.length}</strong>
+                {discrepancies.length > 0 && (
+                  <span className="text-[11px] font-extrabold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded mt-1 inline-block">
+                    ⚠️ {discrepancies.length} tỉ số cần xác nhận
+                  </span>
+                )}
               </article>
               <article className="bg-card border border-border rounded-lg p-5 shadow-[0_12px_30px_rgba(31,41,55,0.08)] bg-white">
                 <span className="text-muted-foreground text-[13px] block">
@@ -1053,6 +1146,86 @@ function AdminPageContent() {
                 </div>
               )}
             </article>
+
+            {/* ─── Knockout Point Multiplier ─── */}
+            {matches.some((lm) => isKnockout(lm.match.stage)) && (
+              <article className="bg-card border border-border rounded-lg shadow-[0_12px_30px_rgba(31,41,55,0.08)] overflow-hidden bg-white">
+                <div className="p-6 border-b border-border bg-[linear-gradient(180deg,rgba(47,125,92,0.02),transparent)]">
+                  <h3 className="text-[17px] font-bold text-foreground mb-1">
+                    ✨ {t("knockoutDoublePointsTitle")}
+                  </h3>
+                  <p className="text-muted-foreground text-[13px] mt-0.5">
+                    {t("knockoutDoublePointsSub")}
+                  </p>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[620px] text-left border-collapse text-[13px]">
+                    <thead>
+                      <tr className="border-b border-border bg-gray-50 text-muted-foreground font-extrabold uppercase tracking-wider text-[11px]">
+                        <th className="px-6 py-4">{t("stage")}</th>
+                        <th className="px-6 py-4">{t("matchInfo")}</th>
+                        <th className="px-6 py-4 text-center">{t("predictionStatus")}</th>
+                        <th className="px-6 py-4 text-right pr-8">{t("pointMultiplierLabel")}</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {matches
+                        .filter((lm) => isKnockout(lm.match.stage))
+                        .sort((a, b) => new Date(a.match.kickoffAt).getTime() - new Date(b.match.kickoffAt).getTime())
+                        .map((lm) => (
+                          <tr key={lm.id} className="hover:bg-[#fcfbf7] transition-all">
+                            <td className="px-6 py-4 text-muted-foreground font-semibold text-[11px] uppercase tracking-wider">
+                              {stageLabel(lm.match.stage, lm.match.groupName)}
+                            </td>
+                            <td className="px-6 py-4 font-bold text-foreground">
+                              <div className="flex items-center gap-2">
+                                <TeamLogo team={lm.match.homeTeam} />
+                                <span className="truncate">{lm.match.homeTeam.name}</span>
+                                <span className="text-muted-foreground font-normal text-[11px]">vs</span>
+                                <TeamLogo team={lm.match.awayTeam} />
+                                <span className="truncate">{lm.match.awayTeam.name}</span>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 text-center">
+                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full border text-[11px] font-extrabold uppercase ${
+                                lm.status === "SCORED"
+                                  ? "border-primary/20 bg-[#E8F5E9] text-[#2F7D5C]"
+                                  : lm.status === "OPEN"
+                                    ? "border-green-200 bg-green-50 text-green-700"
+                                    : "border-gray-200 bg-gray-50 text-gray-500"
+                              }`}>
+                                {lm.status === "SCORED" ? t("processed") : lm.status === "OPEN" ? t("predictionOpen") : lm.status}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-right pr-8">
+                              <div className="inline-flex items-center gap-1.5 justify-end">
+                                {([1, 2, 3] as const).map((val) => (
+                                  <button
+                                    key={val}
+                                    onClick={() => lm.pointMultiplier !== val && handleSetMultiplier(lm.id, val)}
+                                    disabled={settingMultiplierId === lm.id}
+                                    className={`min-w-[52px] px-3 py-1.5 rounded-lg text-[12px] font-extrabold border transition-all disabled:opacity-50 ${
+                                      lm.pointMultiplier === val
+                                        ? val === 1
+                                          ? "border-gray-300 bg-gray-100 text-gray-700"
+                                          : val === 2
+                                            ? "border-[#2F7D5C] bg-[#E8F5E9] text-[#2F7D5C]"
+                                            : "border-amber-400 bg-amber-50 text-amber-800"
+                                        : "border-border bg-white text-muted-foreground hover:bg-gray-50"
+                                    }`}
+                                  >
+                                    x{val}
+                                  </button>
+                                ))}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+              </article>
+            )}
           </div>
         )}
 
@@ -1306,45 +1479,110 @@ function AdminPageContent() {
                 </thead>
                 <tbody className="divide-y divide-border">
                   {scoreRows.map((lm) => {
-                    const homeVal = scoreState[lm.match.id]?.home ?? "";
-                    const awayVal = scoreState[lm.match.id]?.away ?? "";
+                    const s = scoreState[lm.match.id] ?? { home: "", away: "", duration: "REGULAR", etHome: "", etAway: "", penHome: "", penAway: "" };
                     const isScored = lm.status === "SCORED";
+                    const disabled = scoringId === lm.match.id || isScored;
+                    const hasET = s.duration !== "REGULAR";
+                    const hasPen = s.duration === "PENALTY_SHOOTOUT";
+                    const canSubmit = s.home !== "" && s.away !== "";
 
                     return (
                       <tr key={lm.id} className="hover:bg-[#fcfbf7] transition-all">
-                        <td className="px-6 py-4 text-muted-foreground font-semibold text-[11px] uppercase tracking-wider">
+                        <td className="px-6 py-4 text-muted-foreground font-semibold text-[11px] uppercase tracking-wider align-top pt-5">
                           {stageLabel(lm.match.stage, lm.match.groupName)}
                         </td>
                         <td className="px-6 py-4">
-                          <div className="flex items-center justify-center gap-4">
-                            <span className="font-extrabold text-foreground w-36 text-right truncate">
+                          {/* 90-min score row */}
+                          <div className="flex items-center gap-3 mb-2">
+                            <span className="font-extrabold text-foreground w-28 text-right truncate text-[12px]">
                               {lm.match.homeTeam.name}
                             </span>
                             <div className="flex items-center gap-1">
                               <input
                                 type="number"
                                 min="0"
-                                disabled={scoringId === lm.match.id || isScored}
-                                value={homeVal}
+                                disabled={disabled}
+                                value={s.home}
                                 onChange={(e) => handleScoreChange(lm.match.id, "home", e.target.value)}
                                 className="w-10 px-2 py-1 bg-white border border-border rounded text-center font-bold text-xs outline-none focus:border-primary"
                               />
-                              <span className="text-muted-foreground">-</span>
+                              <span className="text-muted-foreground text-xs">-</span>
                               <input
                                 type="number"
                                 min="0"
-                                disabled={scoringId === lm.match.id || isScored}
-                                value={awayVal}
+                                disabled={disabled}
+                                value={s.away}
                                 onChange={(e) => handleScoreChange(lm.match.id, "away", e.target.value)}
                                 className="w-10 px-2 py-1 bg-white border border-border rounded text-center font-bold text-xs outline-none focus:border-primary"
                               />
                             </div>
-                            <span className="font-extrabold text-foreground w-36 text-left truncate">
+                            <span className="font-extrabold text-foreground w-28 text-left truncate text-[12px]">
                               {lm.match.awayTeam.name}
                             </span>
+                            {/* Duration selector */}
+                            <select
+                              disabled={disabled}
+                              value={s.duration}
+                              onChange={(e) => handleScoreChange(lm.match.id, "duration", e.target.value)}
+                              className="ml-2 px-2 py-1 border border-border rounded text-[11px] font-bold bg-white outline-none focus:border-primary"
+                            >
+                              <option value="REGULAR">{t("durationRegular")}</option>
+                              <option value="EXTRA_TIME">{t("durationExtraTime")}</option>
+                              <option value="PENALTY_SHOOTOUT">{t("durationPenalty")}</option>
+                            </select>
                           </div>
+                          {/* ET score row */}
+                          {hasET && (
+                            <div className="flex items-center gap-3 mb-1 pl-1">
+                              <span className="text-[11px] text-amber-700 font-bold w-28 text-right">{t("etScoreLabel")}</span>
+                              <div className="flex items-center gap-1">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  disabled={disabled}
+                                  value={s.etHome}
+                                  onChange={(e) => handleScoreChange(lm.match.id, "etHome", e.target.value)}
+                                  className="w-10 px-2 py-1 bg-amber-50 border border-amber-200 rounded text-center font-bold text-xs outline-none focus:border-amber-400"
+                                />
+                                <span className="text-muted-foreground text-xs">-</span>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  disabled={disabled}
+                                  value={s.etAway}
+                                  onChange={(e) => handleScoreChange(lm.match.id, "etAway", e.target.value)}
+                                  className="w-10 px-2 py-1 bg-amber-50 border border-amber-200 rounded text-center font-bold text-xs outline-none focus:border-amber-400"
+                                />
+                              </div>
+                            </div>
+                          )}
+                          {/* Penalty score row */}
+                          {hasPen && (
+                            <div className="flex items-center gap-3 pl-1">
+                              <span className="text-[11px] text-blue-700 font-bold w-28 text-right">{t("penaltyScoreLabel")}</span>
+                              <div className="flex items-center gap-1">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  disabled={disabled}
+                                  value={s.penHome}
+                                  onChange={(e) => handleScoreChange(lm.match.id, "penHome", e.target.value)}
+                                  className="w-10 px-2 py-1 bg-blue-50 border border-blue-200 rounded text-center font-bold text-xs outline-none focus:border-blue-400"
+                                />
+                                <span className="text-muted-foreground text-xs">-</span>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  disabled={disabled}
+                                  value={s.penAway}
+                                  onChange={(e) => handleScoreChange(lm.match.id, "penAway", e.target.value)}
+                                  className="w-10 px-2 py-1 bg-blue-50 border border-blue-200 rounded text-center font-bold text-xs outline-none focus:border-blue-400"
+                                />
+                              </div>
+                            </div>
+                          )}
                         </td>
-                        <td className="px-6 py-4 text-right pr-8">
+                        <td className="px-6 py-4 text-right pr-8 align-top pt-5">
                           {isScored ? (
                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full border border-primary/20 bg-[#e7f2eb] text-primary-strong text-[11px] font-extrabold uppercase" style={{ color: '#2F7D5C', backgroundColor: '#E8F5E9' }}>
                               {t("processed")}
@@ -1352,7 +1590,7 @@ function AdminPageContent() {
                           ) : (
                             <button
                               onClick={() => handleManualScoreSubmit(lm.match.id)}
-                              disabled={scoringId === lm.match.id || homeVal === "" || awayVal === ""}
+                              disabled={scoringId === lm.match.id || !canSubmit}
                               className="min-h-[32px] px-3.5 py-1 bg-primary hover:bg-primary-strong text-white font-extrabold rounded transition-all text-xs disabled:opacity-50"
                               style={{ backgroundColor: '#2F7D5C' }}
                             >
@@ -1376,12 +1614,93 @@ function AdminPageContent() {
           </article>
         )}
 
+        {activeTab === "results" && discrepancies.length > 0 && (
+          <article className="bg-white border border-amber-200 rounded-lg shadow-[0_12px_30px_rgba(31,41,55,0.08)] overflow-hidden">
+            <div className="p-6 border-b border-amber-200 bg-amber-50">
+              <h3 className="text-[17px] font-bold text-amber-900 mb-1 flex items-center gap-1.5">
+                ⚠️ {t("rescoreMatchTitle")}
+                <span className="ml-1 inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-600 text-white text-[11px] font-extrabold">
+                  {discrepancies.length}
+                </span>
+              </h3>
+              <p className="text-amber-700 text-[13px] mt-0.5">{t("rescoreMatchSub")}</p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[700px] text-left border-collapse text-[13px]">
+                <thead>
+                  <tr className="border-b border-border bg-gray-50 text-muted-foreground font-extrabold uppercase tracking-wider text-[11px]">
+                    <th className="px-6 py-4">{t("stage")}</th>
+                    <th className="px-6 py-4">{t("matchInfo")}</th>
+                    <th className="px-6 py-4 text-center">{t("storedScoreLabel")}</th>
+                    <th className="px-6 py-4 text-center">{t("providerScoreLabel")}</th>
+                    <th className="px-6 py-4 text-right pr-8">{t("colActions")}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {discrepancies.map((d) => (
+                    <tr key={d.matchId} className="hover:bg-amber-50/40 transition-all">
+                      <td className="px-6 py-4 text-muted-foreground font-semibold text-[11px] uppercase tracking-wider">
+                        {stageLabel(d.stage, d.groupName)}
+                      </td>
+                      <td className="px-6 py-4 font-bold text-foreground">
+                        {d.homeTeam.name} vs {d.awayTeam.name}
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <span className="inline-block px-2.5 py-1 rounded-lg bg-gray-100 font-black text-gray-500 text-[14px] line-through">
+                          {d.scoredHomeScore} - {d.scoredAwayScore}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <span className="inline-block px-2.5 py-1 rounded-lg border-2 border-amber-400 bg-amber-50 font-black text-amber-800 text-[14px]">
+                          {d.providerHomeScore} - {d.providerAwayScore}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-right pr-8">
+                        <button
+                          onClick={() => handleConfirmCorrection(d)}
+                          disabled={confirmingMatchId === d.matchId}
+                          className="min-h-[32px] px-3.5 py-1 font-extrabold rounded transition-all text-[12px] disabled:opacity-50 border border-amber-400 bg-amber-100 text-amber-900 hover:bg-amber-200"
+                        >
+                          {confirmingMatchId === d.matchId ? t("saving") : t("confirmCorrectionBtn")}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </article>
+        )}
+
         {activeTab === "settings" && (
           <article className="bg-card border border-border rounded-lg p-6 shadow-[0_12px_30px_rgba(31,41,55,0.08)] bg-white">
             <h3 className="text-[17px] font-bold text-foreground mb-4 flex items-center gap-1.5">
               <Settings size={18} className="text-primary-strong" style={{ color: '#2F7D5C' }} />
               {t("generalSettings")}
             </h3>
+            {/* ─── Setup Guide ─── */}
+            <div className="mb-6 rounded-xl border-2 border-blue-200 bg-blue-50 p-4">
+              <div className="text-[13px] font-extrabold text-blue-900 mb-3 flex items-center gap-2">
+                📋 {t("adminSetupGuideTitle")}
+              </div>
+              <ol className="space-y-2.5">
+                {[
+                  { icon: "⏰", label: t("adminSetupLockMinutes"), help: t("adminSetupLockMinutesHelp") },
+                  { icon: "⏱", label: t("adminSetupETLabel"), help: t("adminSetupETHelp") },
+                  { icon: "⭐", label: t("adminSetupHopeStarLabel"), help: t("adminSetupHopeStarHelp") },
+                  { icon: "⚡", label: t("adminSetupMultiplierLabel"), help: t("adminSetupMultiplierHelp") },
+                ].map((step, i) => (
+                  <li key={i} className="flex items-start gap-3">
+                    <span className="flex-shrink-0 w-5 h-5 rounded-full bg-blue-600 text-white text-[10px] font-extrabold grid place-items-center mt-0.5">{i + 1}</span>
+                    <div>
+                      <div className="text-[12px] font-extrabold text-blue-900">{step.icon} {step.label}</div>
+                      <div className="text-[11px] text-blue-700 mt-0.5">{step.help}</div>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            </div>
+
             <div className="space-y-4 text-[13px]">
               <div className="grid gap-1.5 max-w-sm">
                 <label className="text-[11px] font-extrabold text-muted-foreground uppercase tracking-wider">
@@ -1399,6 +1718,39 @@ function AdminPageContent() {
               <p className="text-muted-foreground text-[12px]">
                 {t("lockTimingHelpText")}
               </p>
+              {/* Score by extra time toggle */}
+              <div className="flex items-start gap-3 pt-1">
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={scoreByExtraTime}
+                  onClick={() => setScoreByExtraTime((v) => !v)}
+                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus:outline-none ${scoreByExtraTime ? "bg-[#2F7D5C]" : "bg-gray-200"}`}
+                >
+                  <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-sm ring-0 transition-transform ${scoreByExtraTime ? "translate-x-5" : "translate-x-0"}`} />
+                </button>
+                <div>
+                  <div className="text-[13px] font-bold text-foreground">{t("scoreByExtraTimeSetting")}</div>
+                  <div className="text-[12px] text-muted-foreground mt-0.5">{t("scoreByExtraTimeHelp")}</div>
+                </div>
+              </div>
+
+              {/* Hope star count */}
+              <div className="grid gap-1.5 max-w-sm">
+                <label className="text-[11px] font-extrabold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                  ⭐ {t("hopeStarCountSetting")}
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  max={20}
+                  value={hopeStarCount}
+                  onChange={(e) => setHopeStarCount(Number(e.target.value))}
+                  className="w-full min-h-[40px] px-3 py-2 bg-white border border-border rounded text-foreground outline-none text-xs focus:border-primary"
+                />
+                <p className="text-muted-foreground text-[12px]">{t("hopeStarCountHelp")}</p>
+              </div>
+
               <button
                 type="button"
                 onClick={handleSaveSettings}

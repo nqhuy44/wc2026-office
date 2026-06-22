@@ -1,0 +1,1 @@
+ALTER TABLE "LeagueMatch" ADD COLUMN "pointMultiplier" INTEGER NOT NULL DEFAULT 1;

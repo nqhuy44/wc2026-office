@@ -1,0 +1,7 @@
+ALTER TABLE "Match" ADD COLUMN "regularTimeHome" INTEGER;
+ALTER TABLE "Match" ADD COLUMN "regularTimeAway" INTEGER;
+ALTER TABLE "Match" ADD COLUMN "extraTimeHome" INTEGER;
+ALTER TABLE "Match" ADD COLUMN "extraTimeAway" INTEGER;
+ALTER TABLE "Match" ADD COLUMN "penaltiesHome" INTEGER;
+ALTER TABLE "Match" ADD COLUMN "penaltiesAway" INTEGER;
+ALTER TABLE "Match" ADD COLUMN "duration" TEXT;

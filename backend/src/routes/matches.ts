@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { prisma } from "../lib/prisma.js";
-import { refreshLeagueMatchStatuses } from "../lib/league-match-state.js";
+import { refreshLeagueMatchStatuses, HOPE_STAR_COUNT_SETTING_KEY } from "../lib/league-match-state.js";
 
 export async function matchRoutes(app: FastifyInstance) {
   app.get("/matches", { preHandler: [app.requireLeagueMember] }, async (request) => {
@@ -11,44 +11,40 @@ export async function matchRoutes(app: FastifyInstance) {
 
     await refreshLeagueMatchStatuses(leagueId);
 
-    const leagueMatches = await prisma.leagueMatch.findMany({
-      where: {
-        leagueId,
-        // Regular users see active league matches, plus any match they already predicted
-        // so closed matches don't reappear just because the global fixture went live/finished.
-        // Admin passes ?all=true to see everything.
-        ...(!showAll ? {
-          OR: [
-            { isPredictionEnabled: true },
-            { predictions: { some: { memberId: leagueMember.id, resultType: { not: "VOID" } } } }
-          ]
-        } : {})
-      },
-      include: {
-        match: {
-          include: {
-            homeTeam: true,
-            awayTeam: true
+    const [leagueMatches, hopeStarSetting, hopeStarUsed] = await Promise.all([
+      prisma.leagueMatch.findMany({
+        where: {
+          leagueId,
+          ...(!showAll ? {
+            OR: [
+              { isPredictionEnabled: true },
+              { predictions: { some: { memberId: leagueMember.id, resultType: { not: "VOID" } } } }
+            ]
+          } : {})
+        },
+        include: {
+          match: { include: { homeTeam: true, awayTeam: true } },
+          predictions: {
+            where: { memberId: leagueMember.id, resultType: { not: "VOID" } }
           }
         },
-        predictions: {
-          where: {
-            memberId: leagueMember.id,
-            resultType: { not: "VOID" }
-          }
-        }
-      },
-      orderBy: {
-        match: {
-          kickoffAt: 'asc'
-        }
-      }
-    });
+        orderBy: { match: { kickoffAt: 'asc' } }
+      }),
+      prisma.appSetting.findUnique({
+        where: { leagueId_key: { leagueId, key: HOPE_STAR_COUNT_SETTING_KEY } }
+      }),
+      prisma.prediction.count({
+        where: { memberId: leagueMember.id, isHopeStar: true, leagueMatch: { leagueId } }
+      })
+    ]);
+
+    const hopeStarTotal = typeof hopeStarSetting?.value === "number" ? Math.max(0, Math.trunc(hopeStarSetting.value as number)) : 0;
 
     const mappedMatches = leagueMatches.map(lm => ({
       id: lm.id,
       status: lm.status,
       isPredictionEnabled: lm.isPredictionEnabled,
+      pointMultiplier: lm.pointMultiplier,
       lockAt: lm.lockAt,
       match: {
         id: lm.match.id,
@@ -77,11 +73,12 @@ export async function matchRoutes(app: FastifyInstance) {
         id: lm.predictions[0].id,
         homeScorePred: lm.predictions[0].homeScorePred,
         awayScorePred: lm.predictions[0].awayScorePred,
+        isHopeStar: lm.predictions[0].isHopeStar,
         points: lm.predictions[0].points,
         resultType: lm.predictions[0].resultType
       } : null
     }));
 
-    return { matches: mappedMatches };
+    return { matches: mappedMatches, hopeStarTotal, hopeStarUsed };
   });
 }

@@ -4,6 +4,8 @@ import { prisma } from "./prisma.js";
 const TERMINAL_STATUSES = ["SCORED", "FINISHED", "VOID"] as const;
 export const FALLBACK_LIVE_WINDOW_MS = 3 * 60 * 60 * 1000;
 export const PREDICTION_LOCK_SETTING_KEY = "predictionLockMinutes";
+export const SCORE_BY_EXTRA_TIME_SETTING_KEY = "scoreByExtraTime";
+export const HOPE_STAR_COUNT_SETTING_KEY = "hopeStarCount";
 
 function normalizeLockMinutes(value: unknown) {
   if (typeof value !== "number" || !Number.isFinite(value)) return null;

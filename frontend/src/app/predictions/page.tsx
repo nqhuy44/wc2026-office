@@ -12,7 +12,7 @@ interface Team { id: string; name: string; shortName: string; flagUrl: string; }
 interface Match { id: string; stage: string; groupName: string | null; kickoffAt: string; homeScore: number | null; awayScore: number | null; homeTeam: Team; awayTeam: Team; }
 interface LeagueMatch {
   id: string; status: string; isPredictionEnabled: boolean; lockAt: string; match: Match;
-  myPrediction: { homeScorePred: number; awayScorePred: number; points: number; resultType: string; } | null;
+  myPrediction: { homeScorePred: number; awayScorePred: number; isHopeStar: boolean; points: number; resultType: string; } | null;
 }
 
 type Filter = "all" | "exact" | "correct" | "wrong" | "pending";
@@ -143,7 +143,10 @@ export default function PredictionsPage() {
                     <div className="text-[11px] text-muted-foreground font-semibold uppercase sm:mb-0">
                       {t("yourPick")}
                     </div>
-                    <div className="text-[16px] font-black">{p.homeScorePred} – {p.awayScorePred}</div>
+                    <div className="text-[16px] font-black flex items-center gap-1">
+                      {p.homeScorePred} – {p.awayScorePred}
+                      {p.isHopeStar && <span className="text-amber-500 text-[15px]">⭐</span>}
+                    </div>
                   </div>
                   {/* Result */}
                   {isScored && hasFinal && (
@@ -156,7 +159,7 @@ export default function PredictionsPage() {
                       </div>
                       <div className="flex flex-row sm:flex-col items-center sm:items-end justify-between gap-2 sm:gap-0.5 sm:min-w-[80px]">
                         <span className={`text-[13px] font-bold px-2.5 py-0.5 rounded-md ${isExact ? 'kp-pts-exact' : isCorrect ? 'kp-pts-correct' : 'kp-pts-wrong'}`}>
-                          +{p.points} {language === "vi" ? "đ" : "pts"}
+                          {p.points >= 0 ? '+' : ''}{p.points} {language === "vi" ? "đ" : "pts"}
                         </span>
                         <span className={`text-[11px] font-semibold ${isExact ? 'text-success' : isCorrect ? 'text-blue-dark' : 'text-muted-foreground'}`}>
                           {isExact 
