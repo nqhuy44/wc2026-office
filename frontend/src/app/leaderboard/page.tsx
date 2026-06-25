@@ -180,16 +180,12 @@ export default function LeaderboardPage() {
       </p>
 
       {/* Tab bar */}
-      <div className="flex gap-1 mb-6 border-b border-gray-200">
+      <div className="kp-tabs mb-6">
         {tabs.map(tab => (
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
-            className={`px-4 py-2 text-[14px] font-semibold border-b-2 transition-colors ${
-              activeTab === tab.key
-                ? "border-[#2F7D5C] text-[#2F7D5C]"
-                : "border-transparent text-gray-500 hover:text-gray-700"
-            }`}
+            className={`kp-tab ${activeTab === tab.key ? "kp-tab-active" : ""}`}
           >
             {tab.label}
           </button>

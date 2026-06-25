@@ -115,11 +115,11 @@ const KNOCKOUT_ROUNDS = [
 ];
 
 // ── Bracket layout constants ──────────────────────────────────────────────────
-const BKT_SLOT    = 80;   // row height for one R32 slot (px)
-const BKT_CARD_W  = 200;  // match card width (px)
-const BKT_CARD_H  = 69;   // match card height: header 18 + row 25 + div 1 + row 25
-const BKT_COL_GAP = 40;   // gap between columns (connector area)
-const BKT_TOTAL_H = 16 * BKT_SLOT; // 1280px
+const BKT_SLOT    = 104;  // row height for one R32 slot (px)
+const BKT_CARD_W  = 230;  // match card width (px)
+const BKT_CARD_H  = 90;   // match card height: header 22 + row 33 + div 1 + row 33 + border 1
+const BKT_COL_GAP = 44;   // gap between columns (connector area)
+const BKT_TOTAL_H = 16 * BKT_SLOT; // 1664px
 
 const BRACKET_ROUND_DEFS = [
   { labelVi: "Round of 32",  labelEn: "Round of 32",    matchNos: [74, 77, 73, 75, 83, 84, 81, 82, 76, 78, 79, 80, 86, 88, 85, 87] },
@@ -152,30 +152,30 @@ function BracketCard({ match, language }: { match: ResolvedKnockoutMatch; langua
     : "TBD";
 
   const renderRow = (entrant: ResolvedEntrant, score: number | null, won: boolean) => (
-    <div style={{ height: 25, display: "flex", alignItems: "center", gap: 5, padding: "0 8px", background: won ? "#f0fdf4" : "transparent" }}>
+    <div style={{ height: 33, display: "flex", alignItems: "center", gap: 7, padding: "0 10px", background: won ? "#f0fdf4" : "transparent" }}>
       {entrant.team ? (
         entrant.team.flagUrl
-          ? <img src={entrant.team.flagUrl} style={{ width: 13, height: 13, objectFit: "contain", flexShrink: 0 }} alt="" />
-          : <span style={{ width: 13, height: 13, borderRadius: "50%", background: "#e5e7eb", fontSize: 8, fontWeight: 700, color: "#6b7280", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          ? <img src={entrant.team.flagUrl} style={{ width: 18, height: 18, objectFit: "contain", flexShrink: 0 }} alt="" />
+          : <span style={{ width: 18, height: 18, borderRadius: "50%", background: "#e5e7eb", fontSize: 9, fontWeight: 700, color: "#6b7280", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
               {(entrant.team.shortName ?? entrant.team.name).slice(0, 2).toUpperCase()}
             </span>
       ) : (
-        <span style={{ width: 13, height: 13, borderRadius: "50%", border: "1px dashed #d1d5db", background: "#f9fafb", fontSize: 8, fontWeight: 800, color: "#9ca3af", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>?</span>
+        <span style={{ width: 18, height: 18, borderRadius: "50%", border: "1px dashed #d1d5db", background: "#f9fafb", fontSize: 9, fontWeight: 800, color: "#9ca3af", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>?</span>
       )}
-      <span style={{ fontSize: 11, fontWeight: won ? 700 : 500, color: won ? "#111827" : "#4b5563", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
+      <span style={{ fontSize: 13, fontWeight: won ? 700 : 500, color: won ? "#111827" : "#374151", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
         {entrant.team?.name ?? entrant.label}
       </span>
-      <span style={{ fontSize: 12, fontWeight: 900, color: won ? "#15803d" : scored ? "#374151" : "#d1d5db", flexShrink: 0, marginLeft: 2 }}>
+      <span style={{ fontSize: 14, fontWeight: 900, color: won ? "#15803d" : scored ? "#111827" : "#d1d5db", flexShrink: 0, marginLeft: 4 }}>
         {score ?? "—"}
       </span>
     </div>
   );
 
   return (
-    <div style={{ width: BKT_CARD_W, border: "1px solid #e5e7eb", borderRadius: 6, background: "#fff", boxShadow: "0 1px 2px rgba(0,0,0,0.06)", overflow: "hidden" }}>
-      <div style={{ height: 18, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 8px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
-        <span style={{ fontSize: 9, fontWeight: 800, color: "#6b7280", textTransform: "uppercase" }}>{match.shortLabel}</span>
-        <span style={{ fontSize: 9, color: "#9ca3af" }}>{dateStr}</span>
+    <div style={{ width: BKT_CARD_W, border: "1px solid #e5e7eb", borderRadius: 7, background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.08)", overflow: "hidden" }}>
+      <div style={{ height: 22, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 10px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
+        <span style={{ fontSize: 10, fontWeight: 800, color: "#6b7280", textTransform: "uppercase" }}>{match.shortLabel}</span>
+        <span style={{ fontSize: 10, color: "#9ca3af" }}>{dateStr}</span>
       </div>
       {renderRow(match.home, match.homeScore, homeWon)}
       <div style={{ height: 1, background: "#f3f4f6" }} />
