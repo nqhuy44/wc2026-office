@@ -38,6 +38,47 @@ export async function getLeagueLockAt(leagueId: string, kickoffAt: Date) {
   return getLockAt(kickoffAt, minutes);
 }
 
+// Called after each provider sync to pull new global matches into every active league.
+// Admin "Sync Matches" button is the manual fallback for the same operation.
+export async function autoSyncLeagueMatches() {
+  const [leagues, allMatches] = await Promise.all([
+    prisma.league.findMany({ where: { isActive: true }, select: { id: true } }),
+    prisma.match.findMany({ select: { id: true } }),
+  ]);
+
+  if (leagues.length === 0 || allMatches.length === 0) return;
+
+  let totalCreated = 0;
+
+  for (const league of leagues) {
+    const existing = await prisma.leagueMatch.findMany({
+      where: { leagueId: league.id },
+      select: { matchId: true },
+    });
+
+    const existingIds = new Set(existing.map((lm) => lm.matchId));
+    const newMatches = allMatches.filter((m) => !existingIds.has(m.id));
+
+    if (newMatches.length === 0) continue;
+
+    await prisma.leagueMatch.createMany({
+      data: newMatches.map((m) => ({
+        leagueId: league.id,
+        matchId: m.id,
+        isPredictionEnabled: false,
+        status: "SCHEDULED",
+      })),
+      skipDuplicates: true,
+    });
+
+    totalCreated += newMatches.length;
+  }
+
+  if (totalCreated > 0) {
+    console.log(`[autoSync] Added ${totalCreated} new LeagueMatch records across ${leagues.length} league(s)`);
+  }
+}
+
 export async function refreshLeagueMatchStatuses(leagueId?: string) {
   const now = new Date();
   const leagueMatches = await prisma.leagueMatch.findMany({

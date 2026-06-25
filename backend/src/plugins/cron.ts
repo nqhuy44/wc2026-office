@@ -2,7 +2,7 @@ import fp from "fastify-plugin";
 import type { FastifyPluginAsync } from "fastify";
 import cron from "node-cron";
 import { fetchWorldCupMatches, syncWorldCupStandings } from "../lib/football-api.js";
-import { refreshLeagueMatchStatuses } from "../lib/league-match-state.js";
+import { autoSyncLeagueMatches, refreshLeagueMatchStatuses } from "../lib/league-match-state.js";
 import { env } from "../config/env.js";
 
 const cronPlugin: FastifyPluginAsync = async (app) => {
@@ -24,6 +24,7 @@ const cronPlugin: FastifyPluginAsync = async (app) => {
       app.log.info("Cron: Syncing World Cup matches and standings from provider...");
       await fetchWorldCupMatches();
       await syncWorldCupStandings();
+      await autoSyncLeagueMatches();
     } catch (err) {
       app.log.error({ err }, "Cron: provider sync failed");
     } finally {

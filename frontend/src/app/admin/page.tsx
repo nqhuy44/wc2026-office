@@ -975,6 +975,16 @@ function AdminPageContent() {
                           const q = matchSearchQuery.toLowerCase();
                           return lm.match.homeTeam.name.toLowerCase().includes(q) || lm.match.awayTeam.name.toLowerCase().includes(q);
                         })
+                        .sort((a, b) => {
+                          const DONE = ["LIVE", "FINISHED", "SCORED", "VOID"];
+                          const aDone = DONE.includes(a.status);
+                          const bDone = DONE.includes(b.status);
+                          if (aDone !== bDone) return aDone ? 1 : -1;
+                          const aT = new Date(a.match.kickoffAt).getTime();
+                          const bT = new Date(b.match.kickoffAt).getTime();
+                          // Upcoming: soonest first; Done: most recent first
+                          return aDone ? bT - aT : aT - bT;
+                        })
                         .map((lm) => {
                           const kickoff = new Date(lm.match.kickoffAt);
                           const isTerminal = ["LIVE", "FINISHED", "SCORED", "VOID"].includes(lm.status);
