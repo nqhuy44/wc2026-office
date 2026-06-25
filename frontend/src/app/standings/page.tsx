@@ -148,7 +148,12 @@ function BracketCard({ match, language }: { match: ResolvedKnockoutMatch; langua
   const homeWon = scored && match.homeScore! > match.awayScore!;
   const awayWon = scored && match.awayScore! > match.homeScore!;
   const dateStr = match.kickoffAt
-    ? new Date(match.kickoffAt).toLocaleDateString(language === "vi" ? "vi-VN" : "en-US", { day: "2-digit", month: "2-digit" })
+    ? (() => {
+        const d = new Date(match.kickoffAt);
+        const datePart = d.toLocaleDateString(language === "vi" ? "vi-VN" : "en-US", { day: "2-digit", month: "2-digit" });
+        const timePart = d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false });
+        return `${datePart} ${timePart}`;
+      })()
     : "TBD";
 
   const renderRow = (entrant: ResolvedEntrant, score: number | null, won: boolean) => (
@@ -519,39 +524,99 @@ export default function StandingsPage() {
       return acc;
     }, {});
 
-    const stageIndexes: Record<string, number> = {};
-    const resolvedByMatchNo = new Map<number, ResolvedKnockoutMatch>();
-
     const groupIsComplete = (group: string) => {
-      const providerRows = providerStandings[group];
-      return Boolean(providerRows && providerRows.length === 4 && providerRows.every((row) => row.mp >= 3));
+      const rows = providerStandings[group];
+      return Boolean(rows && rows.length === 4 && rows.every((row) => row.mp >= 3));
     };
+
+    // Phase 1: assign actual DB matches to template slots.
+    // Primary: match by team ID when projected teams are known (accurate once real teams assigned).
+    // Fallback: sequential by kickoff time (covers TBD phase before group stage ends).
+    const actualByNo = new Map<number, LeagueMatch>();
+    // projResolvedByNo tracks projected data so later rounds can resolve winners from earlier ones.
+    const projResolvedByNo = new Map<number, ResolvedKnockoutMatch>();
+
+    const projTeam = (ref: EntrantRef): Team | undefined => {
+      if (ref.kind === "groupRank") {
+        return groupIsComplete(ref.group) ? groupStandings[ref.group]?.[ref.rank - 1]?.team : undefined;
+      }
+      if (ref.kind === "winner" || ref.kind === "loser") {
+        const src = projResolvedByNo.get(ref.matchNo);
+        if (!src) return undefined;
+        return (ref.kind === "winner" ? getWinner(src) : getLoser(src))?.team;
+      }
+      return undefined; // thirdPlace: unknown until bracket is set
+    };
+
+    for (const round of KNOCKOUT_ROUNDS) {
+      const stageActuals = actualMatchesByStage[round.key] ?? [];
+      const stageTemplates = KNOCKOUT_TEMPLATES.filter((t) => t.stage === round.key);
+      const usedIds = new Set<string>();
+
+      // Team-ID matching for slots with known projected teams
+      for (const template of stageTemplates) {
+        const ph = projTeam(template.home);
+        const pa = projTeam(template.away);
+        if (!ph || !pa) continue;
+        const match = stageActuals.find(
+          (a) =>
+            !usedIds.has(a.id) &&
+            a.match.homeTeam.name !== "TBD" &&
+            a.match.homeTeam.id === ph.id &&
+            a.match.awayTeam.id === pa.id
+        );
+        if (match) {
+          actualByNo.set(template.no, match);
+          usedIds.add(match.id);
+        }
+      }
+
+      // Sequential-by-kickoff fallback for remaining unmatched slots
+      const remainingTemplates = stageTemplates.filter((t) => !actualByNo.has(t.no)).sort((a, b) => a.no - b.no);
+      const remainingActuals = stageActuals.filter((a) => !usedIds.has(a.id));
+      remainingActuals.forEach((actual, i) => {
+        if (i < remainingTemplates.length) actualByNo.set(remainingTemplates[i].no, actual);
+      });
+
+      // Store projections so next rounds can resolve winners
+      for (const template of stageTemplates) {
+        const actual = actualByNo.get(template.no);
+        projResolvedByNo.set(template.no, {
+          ...template,
+          actual,
+          home: { label: template.home.label, team: projTeam(template.home) ?? actual?.match.homeTeam },
+          away: { label: template.away.label, team: projTeam(template.away) ?? actual?.match.awayTeam },
+          homeScore: actual?.match.homeScore ?? null,
+          awayScore: actual?.match.awayScore ?? null,
+          kickoffAt: actual?.match.kickoffAt,
+          status: actual?.status ?? "TBD",
+        });
+      }
+    }
+
+    // Phase 2: build final resolved matches with full entrant labels and group-rank fallback
+    const resolvedByMatchNo = new Map<number, ResolvedKnockoutMatch>();
 
     const resolveEntrant = (ref: EntrantRef, actualTeam?: Team): ResolvedEntrant => {
       if (ref.kind === "groupRank") {
         return {
           label: ref.label,
-          team: (groupIsComplete(ref.group) ? groupStandings[ref.group]?.[ref.rank - 1]?.team : undefined) ?? actualTeam
+          team: (groupIsComplete(ref.group) ? groupStandings[ref.group]?.[ref.rank - 1]?.team : undefined) ?? actualTeam,
         };
       }
-
       if (ref.kind === "thirdPlace") {
-        return {
-          label: ref.label,
-          team: actualTeam
-        };
+        return { label: ref.label, team: actualTeam };
       }
-
       const source = resolvedByMatchNo.get(ref.matchNo);
-      const resolved = ref.kind === "winner" ? (source ? getWinner(source) : undefined) : source ? getLoser(source) : undefined;
+      const resolved =
+        ref.kind === "winner"
+          ? source ? getWinner(source) : undefined
+          : source ? getLoser(source) : undefined;
       return resolved ?? { label: ref.label, team: actualTeam };
     };
 
     KNOCKOUT_TEMPLATES.forEach((template) => {
-      const nextIndex = stageIndexes[template.stage] ?? 0;
-      const actual = actualMatchesByStage[template.stage]?.[nextIndex];
-      stageIndexes[template.stage] = nextIndex + 1;
-
+      const actual = actualByNo.get(template.no);
       const resolved: ResolvedKnockoutMatch = {
         ...template,
         actual,
@@ -560,16 +625,16 @@ export default function StandingsPage() {
         homeScore: actual?.match.homeScore ?? null,
         awayScore: actual?.match.awayScore ?? null,
         kickoffAt: actual?.match.kickoffAt,
-        status: actual?.status ?? "TBD"
+        status: actual?.status ?? "TBD",
       };
       resolvedByMatchNo.set(template.no, resolved);
     });
 
     return KNOCKOUT_ROUNDS.map((round) => ({
       ...round,
-      matches: KNOCKOUT_TEMPLATES.filter((template) => template.stage === round.key).map((template) => resolvedByMatchNo.get(template.no)!)
+      matches: KNOCKOUT_TEMPLATES.filter((template) => template.stage === round.key).map((template) => resolvedByMatchNo.get(template.no)!),
     }));
-  }, [matches, groupStandings]);
+  }, [matches, groupStandings, providerStandings]);
 
   const knockoutMatchCount = knockoutByRound.reduce((total, round) => total + round.matches.filter((match) => match.actual).length, 0);
   const knockoutMatchesByNo = useMemo(() => {

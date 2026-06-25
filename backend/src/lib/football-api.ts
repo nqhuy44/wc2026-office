@@ -117,8 +117,15 @@ export async function fetchWorldCupMatches() {
     const data = await response.json();
     const matches = (data as any).matches;
 
+    // Ensure a TBD placeholder team exists for knockout slots with unknown teams.
+    const tbdTeam = await prisma.team.upsert({
+      where: { externalTeamId: "TBD" },
+      update: {},
+      create: { externalTeamId: "TBD", name: "TBD", shortName: "TBD" }
+    });
+
     for (const m of matches) {
-      // 1. Sync Teams
+      // 1. Sync Teams (only when IDs are known)
       const homeTeam = m.homeTeam;
       const awayTeam = m.awayTeam;
 
@@ -156,72 +163,75 @@ export async function fetchWorldCupMatches() {
         });
       }
 
-      // 2. Sync Match
-      if (homeTeam.id && awayTeam.id) {
-        const homeTeamRecord = await prisma.team.findUnique({ where: { externalTeamId: String(homeTeam.id) } });
-        const awayTeamRecord = await prisma.team.findUnique({ where: { externalTeamId: String(awayTeam.id) } });
+      // 2. Sync Match — always upsert even when teams are TBD (knockout placeholders).
+      const homeTeamRecord = homeTeam.id
+        ? await prisma.team.findUnique({ where: { externalTeamId: String(homeTeam.id) } }) ?? tbdTeam
+        : tbdTeam;
+      const awayTeamRecord = awayTeam.id
+        ? await prisma.team.findUnique({ where: { externalTeamId: String(awayTeam.id) } }) ?? tbdTeam
+        : tbdTeam;
 
-        if (!homeTeamRecord || !awayTeamRecord) continue;
+      const periods = extractPeriodScores(m.score);
+      const newStatus = mapStatus(m.status);
 
-        const periods = extractPeriodScores(m.score);
-        const newStatus = mapStatus(m.status);
+      const existingMatch = await prisma.match.findUnique({
+        where: { externalMatchId: String(m.id) }
+      });
 
-        const existingMatch = await prisma.match.findUnique({
-          where: { externalMatchId: String(m.id) }
-        });
-
-        const alreadyScored = existingMatch?.status === 'SCORED';
-        const matchRecord = await prisma.match.upsert({
-          where: { externalMatchId: String(m.id) },
-          update: {
-            kickoffAt: new Date(m.utcDate),
-            stage: mapStage(m.stage),
-            groupName: m.group ? m.group.replace('GROUP_', '') : null,
-            // Preserve SCORED status — don't let API override it.
-            status: alreadyScored ? 'SCORED' : newStatus,
-            // Always update period breakdown so admin can see the full picture.
-            duration: periods.duration,
-            regularTimeHome: periods.regularTimeHome,
-            regularTimeAway: periods.regularTimeAway,
-            extraTimeHome: periods.extraTimeHome,
-            extraTimeAway: periods.extraTimeAway,
-            penaltiesHome: periods.penaltiesHome,
-            penaltiesAway: periods.penaltiesAway,
-            // providerHomeScore/Away = 90-min score for discrepancy detection.
-            providerHomeScore: periods.regularTimeHome,
-            providerAwayScore: periods.regularTimeAway,
-            // homeScore/awayScore = 90-min score, only written on first sync.
-            ...(alreadyScored ? {} : {
-              homeScore: periods.regularTimeHome,
-              awayScore: periods.regularTimeAway,
-            }),
-          },
-          create: {
-            externalMatchId: String(m.id),
-            homeTeamId: homeTeamRecord.id,
-            awayTeamId: awayTeamRecord.id,
-            kickoffAt: new Date(m.utcDate),
-            stage: mapStage(m.stage),
-            groupName: m.group ? m.group.replace('GROUP_', '') : null,
-            status: newStatus,
+      const alreadyScored = existingMatch?.status === 'SCORED';
+      const matchRecord = await prisma.match.upsert({
+        where: { externalMatchId: String(m.id) },
+        update: {
+          // Update teams when real IDs become known (replace TBD placeholder).
+          ...(homeTeam.id && { homeTeamId: homeTeamRecord.id }),
+          ...(awayTeam.id && { awayTeamId: awayTeamRecord.id }),
+          kickoffAt: new Date(m.utcDate),
+          stage: mapStage(m.stage),
+          groupName: m.group ? m.group.replace('GROUP_', '') : null,
+          // Preserve SCORED status — don't let API override it.
+          status: alreadyScored ? 'SCORED' : newStatus,
+          // Always update period breakdown so admin can see the full picture.
+          duration: periods.duration,
+          regularTimeHome: periods.regularTimeHome,
+          regularTimeAway: periods.regularTimeAway,
+          extraTimeHome: periods.extraTimeHome,
+          extraTimeAway: periods.extraTimeAway,
+          penaltiesHome: periods.penaltiesHome,
+          penaltiesAway: periods.penaltiesAway,
+          // providerHomeScore/Away = 90-min score for discrepancy detection.
+          providerHomeScore: periods.regularTimeHome,
+          providerAwayScore: periods.regularTimeAway,
+          // homeScore/awayScore = 90-min score, only written on first sync.
+          ...(alreadyScored ? {} : {
             homeScore: periods.regularTimeHome,
             awayScore: periods.regularTimeAway,
-            regularTimeHome: periods.regularTimeHome,
-            regularTimeAway: periods.regularTimeAway,
-            extraTimeHome: periods.extraTimeHome,
-            extraTimeAway: periods.extraTimeAway,
-            penaltiesHome: periods.penaltiesHome,
-            penaltiesAway: periods.penaltiesAway,
-            duration: periods.duration,
-            providerHomeScore: periods.regularTimeHome,
-            providerAwayScore: periods.regularTimeAway,
-          }
-        });
-
-        // Auto-score when provider marks FINISHED and 90-min score is available.
-        if (newStatus === 'FINISHED' && periods.regularTimeHome !== null && periods.regularTimeAway !== null && matchRecord.status !== 'SCORED') {
-          await scoreMatch(matchRecord.id);
+          }),
+        },
+        create: {
+          externalMatchId: String(m.id),
+          homeTeamId: homeTeamRecord.id,
+          awayTeamId: awayTeamRecord.id,
+          kickoffAt: new Date(m.utcDate),
+          stage: mapStage(m.stage),
+          groupName: m.group ? m.group.replace('GROUP_', '') : null,
+          status: newStatus,
+          homeScore: periods.regularTimeHome,
+          awayScore: periods.regularTimeAway,
+          regularTimeHome: periods.regularTimeHome,
+          regularTimeAway: periods.regularTimeAway,
+          extraTimeHome: periods.extraTimeHome,
+          extraTimeAway: periods.extraTimeAway,
+          penaltiesHome: periods.penaltiesHome,
+          penaltiesAway: periods.penaltiesAway,
+          duration: periods.duration,
+          providerHomeScore: periods.regularTimeHome,
+          providerAwayScore: periods.regularTimeAway,
         }
+      });
+
+      // Auto-score only when both teams are real and provider marks FINISHED.
+      if (homeTeam.id && awayTeam.id && newStatus === 'FINISHED' && periods.regularTimeHome !== null && periods.regularTimeAway !== null && matchRecord.status !== 'SCORED') {
+        await scoreMatch(matchRecord.id);
       }
     }
 
