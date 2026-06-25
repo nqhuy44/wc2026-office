@@ -372,6 +372,10 @@ export const vi = {
   pendingStatus: "Chờ kết quả",
 
   // Leaderboard Keys
+  lbTabOverall: "Tổng hợp",
+  lbTabGroup: "Vòng bảng",
+  lbTabKnockout: "Knockout",
+  lbEmptyTab: "Chưa có dữ liệu cho phần này.",
   leaderboardSub: "{count} người chơi · Vòng bảng đang diễn ra",
   loadingLeaderboard: "Đang tải bảng xếp hạng...",
   noLeaderboardPlayers: "Chưa có người chơi nào trên bảng xếp hạng.",

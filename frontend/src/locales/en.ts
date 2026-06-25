@@ -372,6 +372,10 @@ export const en = {
   pendingStatus: "Pending",
 
   // Leaderboard Keys
+  lbTabOverall: "Overall",
+  lbTabGroup: "Group Stage",
+  lbTabKnockout: "Knockout",
+  lbEmptyTab: "No data for this stage yet.",
   leaderboardSub: "{count} players · Group stage in progress",
   loadingLeaderboard: "Loading leaderboard...",
   noLeaderboardPlayers: "No participants found in the leaderboard yet.",

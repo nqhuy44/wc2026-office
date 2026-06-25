@@ -35,22 +35,119 @@ interface ChampionData {
   allPicks: ChampionPickRow[];
 }
 
+type LbTab = "overall" | "group" | "knockout";
+
+function LeaderboardTable({
+  items,
+  myNickname,
+  champion,
+}: {
+  items: LeaderboardItem[];
+  myNickname: string;
+  champion: ChampionData | null;
+}) {
+  const { t } = useLanguage();
+
+  if (items.length === 0) {
+    return (
+      <div className="text-center py-10 text-[13px] text-muted-foreground">
+        {t("lbEmptyTab")}
+      </div>
+    );
+  }
+
+  return (
+    <div className="kp-card" style={{ padding: 0, overflow: "hidden" }}>
+      <div className="overflow-x-auto">
+        <table className="kp-table min-w-[760px]">
+          <thead>
+            <tr>
+              <th style={{ width: "44px" }}>#</th>
+              <th style={{ width: "40px" }}></th>
+              <th>{t("colDisplayName")}</th>
+              <th className="th-center">{t("colPoints")}</th>
+              <th className="th-center" style={{ minWidth: "80px" }}>{t("colGap")}</th>
+              <th className="th-center">{t("colExact")}</th>
+              <th className="th-center">{t("colCorrect")}</th>
+              <th className="th-center">{t("colWrong")}</th>
+              <th className="th-center">{t("colPlayed")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((item, index) => {
+              const rank = index + 1;
+              const isMe = item.nickname === myNickname;
+              const wrongCount = item.totalPredictions - item.exactMatches - item.correctResults;
+
+              return (
+                <tr key={item.id} className={`${isMe ? "bg-green-50/50" : "hover:bg-gray-50"}`}>
+                  <td style={{ fontWeight: rank <= 3 ? 800 : 600, fontSize: "14px", color: rank <= 3 ? "#111827" : "#6B7280", borderLeft: rank <= 3 ? "3px solid #2F7D5C" : "3px solid transparent" }}>
+                    {rank}
+                  </td>
+                  <td style={{ fontSize: "18px", textAlign: "center" }}>
+                    {rank === 1 ? "🥇" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : ""}
+                  </td>
+                  <td style={{ fontWeight: isMe ? 700 : 500, fontSize: "14px", color: isMe ? "#2F7D5C" : "#1f2937" }}>
+                    <span className="flex items-center gap-1.5 flex-wrap">
+                      {item.nickname}
+                      {isMe && (
+                        <span className="inline-flex items-center gap-1 text-[9px] font-bold bg-green-100 text-green-700 px-1.5 py-0.5 rounded uppercase tracking-wider" style={{ color: "#2F7D5C", backgroundColor: "#E8F5E9" }}>
+                          {t("youLabel")}
+                        </span>
+                      )}
+                      {champion?.championTeam && champion.allPicks.find(p => p.nickname === item.nickname && p.isCorrect) && (
+                        <span className="inline-flex items-center text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider" style={{ background: "#FFF8E1", color: "#F57F17", border: "1px solid #FFE082" }}>
+                          {t("championBadge")}
+                        </span>
+                      )}
+                    </span>
+                  </td>
+                  <td className="td-center" style={{ fontSize: "16px", fontWeight: rank <= 3 ? 800 : 700, color: "#111827" }}>
+                    {item.totalPoints}
+                  </td>
+                  <td className="td-center">
+                    <span className="text-[12px] font-medium text-gray-500">
+                      {rank > 1 ? `-${items[0].totalPoints - item.totalPoints}` : "—"}
+                    </span>
+                  </td>
+                  <td className="td-center" style={{ color: "#4B5563", fontWeight: 600 }}>{item.exactMatches}</td>
+                  <td className="td-center" style={{ color: "#6B7280", fontWeight: 500 }}>{item.correctResults}</td>
+                  <td className="td-center" style={{ color: "#9CA3AF" }}>{wrongCount > 0 ? wrongCount : 0}</td>
+                  <td className="td-center" style={{ color: "#9CA3AF" }}>{item.totalPredictions}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 export default function LeaderboardPage() {
-  const [leaderboard, setLeaderboard] = useState<LeaderboardItem[]>([]);
+  const [overall, setOverall] = useState<LeaderboardItem[]>([]);
+  const [group, setGroup] = useState<LeaderboardItem[]>([]);
+  const [knockout, setKnockout] = useState<LeaderboardItem[]>([]);
+  const [activeTab, setActiveTab] = useState<LbTab>("group");
   const [myNickname, setMyNickname] = useState<string>("");
   const [champion, setChampion] = useState<ChampionData | null>(null);
   const [loading, setLoading] = useState(true);
-  const { language, t } = useLanguage();
+  const { t } = useLanguage();
 
   useEffect(() => {
     async function load() {
       try {
         const [lbData, meData, champData] = await Promise.all([
-          apiClient<{ leaderboard: LeaderboardItem[] }>("/leaderboard"),
+          apiClient<{ leaderboard: LeaderboardItem[]; group: LeaderboardItem[]; knockout: LeaderboardItem[] }>("/leaderboard"),
           apiClient<{ user: { memberships: { nickname: string; leagueId: string }[] } }>("/auth/me"),
           apiClient<ChampionData>("/champion-pick").catch(() => null),
         ]);
-        setLeaderboard(lbData.leaderboard);
+        setOverall(lbData.leaderboard);
+        setGroup(lbData.group);
+        setKnockout(lbData.knockout);
+        // Auto-select tab based on tournament phase
+        const knockoutActive = lbData.knockout.some(p => p.totalPredictions > 0);
+        setActiveTab(knockoutActive ? "knockout" : "group");
         const activeLeagueId = typeof window !== "undefined" ? localStorage.getItem("activeLeagueId") : null;
         const activeMembership = meData.user.memberships.find(m => m.leagueId === activeLeagueId);
         setMyNickname(activeMembership?.nickname ?? "");
@@ -64,28 +161,49 @@ export default function LeaderboardPage() {
     load();
   }, []);
 
-  const maxPts = leaderboard.length > 0 ? leaderboard[0].totalPoints : 1;
-  const myRank = leaderboard.findIndex((item) => item.nickname === myNickname) + 1;
-  const myItem = leaderboard.find((item) => item.nickname === myNickname);
-  const leader = leaderboard[0];
+  const activeItems = activeTab === "overall" ? overall : activeTab === "group" ? group : knockout;
+  const leader = activeItems[0];
+
+  const tabs: { key: LbTab; label: string }[] = [
+    { key: "overall", label: t("lbTabOverall") },
+    { key: "group", label: t("lbTabGroup") },
+    { key: "knockout", label: t("lbTabKnockout") },
+  ];
 
   return (
     <NavigationShell>
       <h1 className="text-[24px] font-bold text-foreground mb-1">
         {t("leaderboardTitle")}
       </h1>
-      <p className="text-[14px] text-muted-foreground mb-6">
-        {t("leaderboardSub").replace("{count}", leaderboard.length.toString())}
+      <p className="text-[14px] text-muted-foreground mb-4">
+        {t("leaderboardSub").replace("{count}", overall.length.toString())}
       </p>
+
+      {/* Tab bar */}
+      <div className="flex gap-1 mb-6 border-b border-gray-200">
+        {tabs.map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            className={`px-4 py-2 text-[14px] font-semibold border-b-2 transition-colors ${
+              activeTab === tab.key
+                ? "border-[#2F7D5C] text-[#2F7D5C]"
+                : "border-transparent text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
 
       {loading ? (
         <div className="flex flex-col items-center justify-center py-16 gap-3">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" style={{ borderColor: '#2F7D5C', borderTopColor: 'transparent' }} />
-          <p className="text-sm font-bold text-muted-foreground" style={{ color: '#2F7D5C' }}>
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" style={{ borderColor: "#2F7D5C", borderTopColor: "transparent" }} />
+          <p className="text-sm font-bold text-muted-foreground" style={{ color: "#2F7D5C" }}>
             {t("loadingLeaderboard")}
           </p>
         </div>
-      ) : leaderboard.length === 0 ? (
+      ) : overall.length === 0 ? (
         <div className="text-center py-16 rounded-lg border border-dashed border-border bg-muted text-muted-foreground bg-white">
           <p className="text-[14px]">
             {t("noLeaderboardPlayers")}
@@ -94,11 +212,11 @@ export default function LeaderboardPage() {
       ) : (
         <>
           {/* Stat Summary Bar */}
-          <div className="kp-card flex items-center gap-4 flex-wrap mb-6" style={{ padding: '14px 20px' }}>
+          <div className="kp-card flex items-center gap-4 flex-wrap mb-6" style={{ padding: "14px 20px" }}>
             {[
-              { icon: '📋', label: t("statScoredLabel"), val: leaderboard[0]?.totalPredictions ?? 0 },
-              { icon: '👥', label: t("statPlayersLabel"), val: leaderboard.length },
-              { icon: '🏆', label: t("statLeaderLabel"), val: leader?.nickname ?? '—' },
+              { icon: "📋", label: t("statScoredLabel"), val: activeItems[0]?.totalPredictions ?? 0 },
+              { icon: "👥", label: t("statPlayersLabel"), val: overall.length },
+              { icon: "🏆", label: t("statLeaderLabel"), val: leader?.nickname ?? "—" },
             ].map((stat, i) => (
               <div key={stat.label} className="flex items-center gap-2">
                 {i > 0 && <div className="w-px h-5 bg-border" />}
@@ -109,72 +227,7 @@ export default function LeaderboardPage() {
             ))}
           </div>
 
-          {/* Leaderboard Table */}
-          <div className="kp-card" style={{ padding: 0, overflow: 'hidden' }}>
-            <div className="overflow-x-auto">
-            <table className="kp-table min-w-[760px]">
-              <thead>
-                <tr>
-                  <th style={{ width: '44px' }}>#</th>
-                  <th style={{ width: '40px' }}></th>
-                  <th>{t("colDisplayName")}</th>
-                  <th className="th-center">{t("colPoints")}</th>
-                  <th className="th-center" style={{ minWidth: '80px' }}>{t("colGap")}</th>
-                  <th className="th-center">{t("colExact")}</th>
-                  <th className="th-center">{t("colCorrect")}</th>
-                  <th className="th-center">{t("colWrong")}</th>
-                  <th className="th-center">{t("colPlayed")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {leaderboard.map((item, index) => {
-                  const rank = index + 1;
-                  const isMe = item.nickname === myNickname;
-                  const wrongCount = item.totalPredictions - item.exactMatches - item.correctResults;
-
-                  return (
-                    <tr key={item.id} className={`${isMe ? 'bg-green-50/50' : 'hover:bg-gray-50'}`}>
-                      <td style={{ fontWeight: rank <= 3 ? 800 : 600, fontSize: '14px', color: rank <= 3 ? '#111827' : '#6B7280', borderLeft: rank <= 3 ? '3px solid #2F7D5C' : '3px solid transparent' }}>
-                        {rank}
-                      </td>
-                      <td style={{ fontSize: '18px', textAlign: 'center' }}>
-                        {rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : ''}
-                      </td>
-                      <td style={{ fontWeight: isMe ? 700 : 500, fontSize: '14px', color: isMe ? '#2F7D5C' : '#1f2937' }}>
-                        <span className="flex items-center gap-1.5 flex-wrap">
-                          {item.nickname}
-                          {isMe && (
-                            <span className="inline-flex items-center gap-1 text-[9px] font-bold bg-green-100 text-green-700 px-1.5 py-0.5 rounded uppercase tracking-wider" style={{ color: '#2F7D5C', backgroundColor: '#E8F5E9' }}>
-                              {t("youLabel")}
-                            </span>
-                          )}
-                          {champion?.championTeam && champion.allPicks.find(p => p.nickname === item.nickname && p.isCorrect) && (
-                            <span className="inline-flex items-center text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider" style={{ background: '#FFF8E1', color: '#F57F17', border: '1px solid #FFE082' }}>
-                              {t("championBadge")}
-                            </span>
-                          )}
-                        </span>
-                      </td>
-                      <td className="td-center" style={{ fontSize: '16px', fontWeight: rank <= 3 ? 800 : 700, color: '#111827' }}>
-                        {item.totalPoints}
-                      </td>
-                      <td className="td-center">
-                        <span className="text-[12px] font-medium text-gray-500">
-                          {rank > 1 ? `-${leaderboard[0].totalPoints - item.totalPoints}` : '—'}
-                        </span>
-                      </td>
-                      <td className="td-center" style={{ color: '#4B5563', fontWeight: 600 }}>{item.exactMatches}</td>
-                      <td className="td-center" style={{ color: '#6B7280', fontWeight: 500 }}>{item.correctResults}</td>
-                      <td className="td-center" style={{ color: '#9CA3AF' }}>{wrongCount > 0 ? wrongCount : 0}</td>
-                      <td className="td-center" style={{ color: '#9CA3AF' }}>{item.totalPredictions}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            </div>
-
-          </div>
+          <LeaderboardTable items={activeItems} myNickname={myNickname} champion={champion} />
 
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mt-6 gap-4 border-t border-gray-100 pt-4">
             <div className="text-[12px] text-gray-500 max-w-lg">
@@ -190,7 +243,7 @@ export default function LeaderboardPage() {
             </div>
           </div>
 
-          {/* ─── Champion Pick Table ─── */}
+          {/* Champion Pick Table */}
           {champion && (
             <div className="mt-8">
               <div className="flex items-center justify-between mb-3">
@@ -198,7 +251,7 @@ export default function LeaderboardPage() {
                   🏆 {t("championPickTableTitle")}
                 </h2>
                 {champion.championTeam && (
-                  <span className="flex items-center gap-2 text-[13px] font-bold px-3 py-1.5 rounded-lg" style={{ background: '#FFF8E1', color: '#F57F17', border: '1px solid #FFE082' }}>
+                  <span className="flex items-center gap-2 text-[13px] font-bold px-3 py-1.5 rounded-lg" style={{ background: "#FFF8E1", color: "#F57F17", border: "1px solid #FFE082" }}>
                     {champion.championTeam.flagUrl && (
                       <img src={champion.championTeam.flagUrl} alt="" className="w-5 h-5 object-contain" />
                     )}
@@ -207,7 +260,7 @@ export default function LeaderboardPage() {
                 )}
               </div>
 
-              <div className="kp-card" style={{ padding: 0, overflow: 'hidden' }}>
+              <div className="kp-card" style={{ padding: 0, overflow: "hidden" }}>
                 {!champion.isLocked && champion.allPicks.length === 0 ? (
                   <p className="text-center text-[13px] text-muted-foreground py-10">
                     {t("championPickNotRevealed")}
@@ -218,57 +271,57 @@ export default function LeaderboardPage() {
                   </p>
                 ) : (
                   <div className="overflow-x-auto">
-                  <table className="kp-table min-w-[560px]">
-                    <thead>
-                      <tr>
-                        <th>{t("championPickColMember")}</th>
-                        <th>{t("championPickColTeam")}</th>
-                        <th className="th-center">{t("championPickColResult")}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {champion.allPicks.map((row) => {
-                        const isMe = row.nickname === myNickname;
-                        return (
-                          <tr key={row.memberId} className={isMe ? "bg-green-50/50" : "hover:bg-gray-50"}>
-                            <td style={{ fontWeight: isMe ? 700 : 500, fontSize: '14px', color: isMe ? '#2F7D5C' : '#1f2937' }}>
-                              {row.nickname}
-                              {isMe && (
-                                <span className="inline-flex items-center gap-1 ml-2 text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider" style={{ color: '#2F7D5C', backgroundColor: '#E8F5E9' }}>
-                                  {t("youLabel")}
-                                </span>
-                              )}
-                            </td>
-                            <td>
-                              <span className="flex items-center gap-2 text-[13px] font-semibold">
-                                {row.team.flagUrl ? (
-                                  <img src={row.team.flagUrl} alt="" className="w-5 h-5 object-contain rounded-sm" />
-                                ) : (
-                                  <span className="w-5 h-5 rounded-sm bg-gray-100 flex items-center justify-center text-[10px]">
-                                    {row.team.shortName?.slice(0,2) ?? row.team.name.slice(0,2)}
+                    <table className="kp-table min-w-[560px]">
+                      <thead>
+                        <tr>
+                          <th>{t("championPickColMember")}</th>
+                          <th>{t("championPickColTeam")}</th>
+                          <th className="th-center">{t("championPickColResult")}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {champion.allPicks.map((row) => {
+                          const isMe = row.nickname === myNickname;
+                          return (
+                            <tr key={row.memberId} className={isMe ? "bg-green-50/50" : "hover:bg-gray-50"}>
+                              <td style={{ fontWeight: isMe ? 700 : 500, fontSize: "14px", color: isMe ? "#2F7D5C" : "#1f2937" }}>
+                                {row.nickname}
+                                {isMe && (
+                                  <span className="inline-flex items-center gap-1 ml-2 text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider" style={{ color: "#2F7D5C", backgroundColor: "#E8F5E9" }}>
+                                    {t("youLabel")}
                                   </span>
                                 )}
-                                {row.team.name}
-                              </span>
-                            </td>
-                            <td className="td-center">
-                              {row.isCorrect === null ? (
-                                <span className="text-[11px] font-semibold text-gray-400">
-                                  {t("championPickPending")}
+                              </td>
+                              <td>
+                                <span className="flex items-center gap-2 text-[13px] font-semibold">
+                                  {row.team.flagUrl ? (
+                                    <img src={row.team.flagUrl} alt="" className="w-5 h-5 object-contain rounded-sm" />
+                                  ) : (
+                                    <span className="w-5 h-5 rounded-sm bg-gray-100 flex items-center justify-center text-[10px]">
+                                      {row.team.shortName?.slice(0, 2) ?? row.team.name.slice(0, 2)}
+                                    </span>
+                                  )}
+                                  {row.team.name}
                                 </span>
-                              ) : row.isCorrect ? (
-                                <span className="inline-flex items-center text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: '#FFF8E1', color: '#F57F17', border: '1px solid #FFE082' }}>
-                                  {t("championBadge")}
-                                </span>
-                              ) : (
-                                <span className="text-[11px] font-semibold text-gray-400">✗</span>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                              </td>
+                              <td className="td-center">
+                                {row.isCorrect === null ? (
+                                  <span className="text-[11px] font-semibold text-gray-400">
+                                    {t("championPickPending")}
+                                  </span>
+                                ) : row.isCorrect ? (
+                                  <span className="inline-flex items-center text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: "#FFF8E1", color: "#F57F17", border: "1px solid #FFE082" }}>
+                                    {t("championBadge")}
+                                  </span>
+                                ) : (
+                                  <span className="text-[11px] font-semibold text-gray-400">✗</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
                 )}
               </div>

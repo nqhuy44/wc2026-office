@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import NavigationShell from "@/components/navigation-shell";
 import { apiClient } from "@/lib/api-client";
 import { useLanguage } from "@/context/language-context";
@@ -114,48 +114,161 @@ const KNOCKOUT_ROUNDS = [
   { key: "FINAL", label: "Final", shortLabel: "Final" }
 ];
 
-const BRACKET_COLUMNS = [
-  {
-    labelVi: "Round of 32",
-    labelEn: "Round of 32",
-    shortLabel: "R32",
-    matchNos: [74, 77, 73, 75, 83, 84, 81, 82, 76, 78, 79, 80, 86, 88, 85, 87],
-    paddingTop: 0,
-    gap: 8
-  },
-  {
-    labelVi: "Vòng 16 đội",
-    labelEn: "Round of 16",
-    shortLabel: "R16",
-    matchNos: [89, 90, 93, 94, 91, 92, 95, 96],
-    paddingTop: 46,
-    gap: 102
-  },
-  {
-    labelVi: "Tứ kết",
-    labelEn: "Quarter-finals",
-    shortLabel: "QF",
-    matchNos: [97, 98, 99, 100],
-    paddingTop: 142,
-    gap: 286
-  },
-  {
-    labelVi: "Bán kết",
-    labelEn: "Semi-finals",
-    shortLabel: "SF",
-    matchNos: [101, 102],
-    paddingTop: 330,
-    gap: 674
-  },
-  {
-    labelVi: "Chung kết",
-    labelEn: "Final",
-    shortLabel: "Final",
-    matchNos: [104],
-    paddingTop: 740,
-    gap: 0
-  }
+// ── Bracket layout constants ──────────────────────────────────────────────────
+const BKT_SLOT    = 80;   // row height for one R32 slot (px)
+const BKT_CARD_W  = 200;  // match card width (px)
+const BKT_CARD_H  = 69;   // match card height: header 18 + row 25 + div 1 + row 25
+const BKT_COL_GAP = 40;   // gap between columns (connector area)
+const BKT_TOTAL_H = 16 * BKT_SLOT; // 1280px
+
+const BRACKET_ROUND_DEFS = [
+  { labelVi: "Round of 32",  labelEn: "Round of 32",    matchNos: [74, 77, 73, 75, 83, 84, 81, 82, 76, 78, 79, 80, 86, 88, 85, 87] },
+  { labelVi: "Vòng 16 đội",  labelEn: "Round of 16",    matchNos: [89, 90, 93, 94, 91, 92, 95, 96] },
+  { labelVi: "Tứ kết",       labelEn: "Quarter-finals",  matchNos: [97, 98, 99, 100] },
+  { labelVi: "Bán kết",      labelEn: "Semi-finals",     matchNos: [101, 102] },
+  { labelVi: "Chung kết",    labelEn: "Final",           matchNos: [104] },
 ];
+
+// cardTop: position of top edge of match card mi in column ci
+function bktCardTop(ci: number, mi: number): number {
+  const sh = BKT_SLOT * Math.pow(2, ci);
+  return mi * sh + (sh - BKT_CARD_H) / 2;
+}
+// cardCenter: vertical center of card mi in column ci
+// bktCardCenter(ci, mi) === midpoint of bktCardCenter(ci-1, 2*mi) and bktCardCenter(ci-1, 2*mi+1)
+function bktCardCenter(ci: number, mi: number): number {
+  return (mi + 0.5) * BKT_SLOT * Math.pow(2, ci);
+}
+function bktColLeft(ci: number): number {
+  return ci * (BKT_CARD_W + BKT_COL_GAP);
+}
+
+function BracketCard({ match, language }: { match: ResolvedKnockoutMatch; language: string }) {
+  const scored = match.homeScore !== null && match.awayScore !== null;
+  const homeWon = scored && match.homeScore! > match.awayScore!;
+  const awayWon = scored && match.awayScore! > match.homeScore!;
+  const dateStr = match.kickoffAt
+    ? new Date(match.kickoffAt).toLocaleDateString(language === "vi" ? "vi-VN" : "en-US", { day: "2-digit", month: "2-digit" })
+    : "TBD";
+
+  const renderRow = (entrant: ResolvedEntrant, score: number | null, won: boolean) => (
+    <div style={{ height: 25, display: "flex", alignItems: "center", gap: 5, padding: "0 8px", background: won ? "#f0fdf4" : "transparent" }}>
+      {entrant.team ? (
+        entrant.team.flagUrl
+          ? <img src={entrant.team.flagUrl} style={{ width: 13, height: 13, objectFit: "contain", flexShrink: 0 }} alt="" />
+          : <span style={{ width: 13, height: 13, borderRadius: "50%", background: "#e5e7eb", fontSize: 8, fontWeight: 700, color: "#6b7280", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              {(entrant.team.shortName ?? entrant.team.name).slice(0, 2).toUpperCase()}
+            </span>
+      ) : (
+        <span style={{ width: 13, height: 13, borderRadius: "50%", border: "1px dashed #d1d5db", background: "#f9fafb", fontSize: 8, fontWeight: 800, color: "#9ca3af", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>?</span>
+      )}
+      <span style={{ fontSize: 11, fontWeight: won ? 700 : 500, color: won ? "#111827" : "#4b5563", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
+        {entrant.team?.name ?? entrant.label}
+      </span>
+      <span style={{ fontSize: 12, fontWeight: 900, color: won ? "#15803d" : scored ? "#374151" : "#d1d5db", flexShrink: 0, marginLeft: 2 }}>
+        {score ?? "—"}
+      </span>
+    </div>
+  );
+
+  return (
+    <div style={{ width: BKT_CARD_W, border: "1px solid #e5e7eb", borderRadius: 6, background: "#fff", boxShadow: "0 1px 2px rgba(0,0,0,0.06)", overflow: "hidden" }}>
+      <div style={{ height: 18, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 8px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
+        <span style={{ fontSize: 9, fontWeight: 800, color: "#6b7280", textTransform: "uppercase" }}>{match.shortLabel}</span>
+        <span style={{ fontSize: 9, color: "#9ca3af" }}>{dateStr}</span>
+      </div>
+      {renderRow(match.home, match.homeScore, homeWon)}
+      <div style={{ height: 1, background: "#f3f4f6" }} />
+      {renderRow(match.away, match.awayScore, awayWon)}
+    </div>
+  );
+}
+
+function KnockoutBracket({ knockoutMatchesByNo, language }: {
+  knockoutMatchesByNo: Map<number, ResolvedKnockoutMatch>;
+  language: string;
+}) {
+  const bracketW = BRACKET_ROUND_DEFS.length * (BKT_CARD_W + BKT_COL_GAP) - BKT_COL_GAP;
+
+  // Build connector lines: for each pair in round ci, draw H-V-H lines to next round
+  const connLines: ReactNode[] = [];
+  BRACKET_ROUND_DEFS.slice(0, -1).forEach((col, ci) => {
+    const cardRight = bktColLeft(ci) + BKT_CARD_W;
+    const connX    = cardRight + BKT_COL_GAP / 2; // midpoint of gap — vertical line sits here
+    const nextLeft = bktColLeft(ci + 1);
+
+    for (let i = 0; i < col.matchNos.length; i += 2) {
+      const tCy = bktCardCenter(ci, i);           // top match center y
+      const bCy = bktCardCenter(ci, i + 1);       // bottom match center y
+      const nCy = bktCardCenter(ci + 1, i / 2);  // next round match center y (= midpoint)
+
+      connLines.push(
+        // horizontal from top match right edge → vertical connector
+        <div key={`ht-${ci}-${i}`} style={{ position: "absolute", top: tCy - 0.5, left: cardRight, width: connX - cardRight, height: 1, background: "#d1d5db" }} />,
+        // horizontal from bottom match right edge → vertical connector
+        <div key={`hb-${ci}-${i}`} style={{ position: "absolute", top: bCy - 0.5, left: cardRight, width: connX - cardRight, height: 1, background: "#d1d5db" }} />,
+        // vertical connector joining both horizontals
+        <div key={`v-${ci}-${i}`}  style={{ position: "absolute", top: tCy, left: connX - 0.5, width: 1, height: bCy - tCy, background: "#d1d5db" }} />,
+        // horizontal from vertical connector → next round card left edge
+        <div key={`hn-${ci}-${i}`} style={{ position: "absolute", top: nCy - 0.5, left: connX, width: nextLeft - connX, height: 1, background: "#d1d5db" }} />
+      );
+    }
+  });
+
+  return (
+    <div style={{ overflowX: "auto" }}>
+      {/* Round header row */}
+      <div style={{ display: "flex", gap: `${BKT_COL_GAP}px`, paddingBottom: 8, minWidth: `${bracketW}px` }}>
+        {BRACKET_ROUND_DEFS.map((col, ci) => (
+          <div key={ci} style={{ width: BKT_CARD_W, flexShrink: 0 }}>
+            <div style={{ height: 30, display: "flex", alignItems: "center", background: "#2F7D5C", borderRadius: 4, padding: "0 10px" }}>
+              <span style={{ fontSize: 11, fontWeight: 900, color: "white", textTransform: "uppercase", letterSpacing: "0.03em" }}>
+                {language === "vi" ? col.labelVi : col.labelEn}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Bracket canvas */}
+      <div style={{ position: "relative", height: `${BKT_TOTAL_H}px`, minWidth: `${bracketW}px` }}>
+        {connLines}
+        {BRACKET_ROUND_DEFS.flatMap((col, ci) =>
+          col.matchNos.map((no, mi) => {
+            const match = knockoutMatchesByNo.get(no);
+            if (!match) return null;
+            return (
+              <div key={no} style={{ position: "absolute", top: bktCardTop(ci, mi), left: bktColLeft(ci) }}>
+                <BracketCard match={match} language={language} />
+              </div>
+            );
+          })
+        )}
+        {/* 3rd place match — placed directly below Final in the same column */}
+        {(() => {
+          const thirdMatch = knockoutMatchesByNo.get(103);
+          if (!thirdMatch) return null;
+          const finalBottom = bktCardTop(4, 0) + BKT_CARD_H;
+          const left = bktColLeft(4);
+          const sepTop  = finalBottom + 10;
+          const labelTop = sepTop + 6;
+          const cardTop  = labelTop + 16;
+          return (
+            <>
+              <div style={{ position: "absolute", top: sepTop, left, width: BKT_CARD_W, height: 1, background: "#e5e7eb" }} />
+              <div style={{ position: "absolute", top: labelTop, left, width: BKT_CARD_W, textAlign: "center", fontSize: 9, fontWeight: 800, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                🥉 {language === "vi" ? "Tranh hạng 3" : "3rd Place"}
+              </div>
+              <div style={{ position: "absolute", top: cardTop, left }}>
+                <BracketCard match={thirdMatch} language={language} />
+              </div>
+            </>
+          );
+        })()}
+      </div>
+    </div>
+  );
+}
 
 const groupRank = (rank: 1 | 2, group: string): EntrantRef => ({
   kind: "groupRank",
@@ -344,6 +457,8 @@ export default function StandingsPage() {
     load();
   }, []);
 
+  const KNOCKOUT_STAGES = ["ROUND_OF_32", "ROUND_OF_16", "QUARTER_FINAL", "SEMI_FINAL", "THIRD_PLACE", "FINAL"];
+
   const load = async () => {
     setLoading(true);
     try {
@@ -352,6 +467,11 @@ export default function StandingsPage() {
         apiClient<ProviderStandingsResponse>("/standings").catch(() => null)
       ]);
       setMatches(matchesData.matches);
+      // Auto-switch to knockout view if any knockout match has been played
+      const knockoutStarted = matchesData.matches.some(
+        lm => KNOCKOUT_STAGES.includes(lm.match.stage) && ["SCORED", "LIVE"].includes(lm.status)
+      );
+      if (knockoutStarted) setViewMode("knockout");
       setProviderStandings(
         standingsData
           ? Object.fromEntries(
@@ -455,44 +575,6 @@ export default function StandingsPage() {
   const knockoutMatchesByNo = useMemo(() => {
     return new Map(knockoutByRound.flatMap((round) => round.matches.map((match) => [match.no, match] as const)));
   }, [knockoutByRound]);
-
-  const renderKnockoutMatch = (match: ResolvedKnockoutMatch, isFinal = false) => (
-    <article key={match.no} className={`relative rounded-lg border border-border bg-white p-2.5 shadow-sm ${isFinal ? "ring-2 ring-[#2F7D5C]/15" : ""}`}>
-      <div className="absolute -left-4 top-1/2 h-px w-4 bg-border" />
-      <div className="absolute -right-4 top-1/2 h-px w-4 bg-border" />
-      <div className="flex items-center justify-between gap-2 mb-2">
-        <div>
-          <span className="text-[11px] font-extrabold text-muted-foreground uppercase">{match.shortLabel}</span>
-          <span className="ml-2 text-[11px] font-bold text-gray-400">{formatStage(match.stage)}</span>
-        </div>
-        <span className="text-[11px] text-muted-foreground">{match.kickoffAt ? formatKickoff(match.kickoffAt, language) : "TBD"}</span>
-      </div>
-
-      <div className="space-y-1.5">
-        <div className="grid grid-cols-[minmax(0,1fr)_40px] items-center gap-2">
-          <EntrantCell entrant={match.home} />
-          <span className="text-right font-black text-[14px]">{match.homeScore === null ? "—" : match.homeScore}</span>
-        </div>
-        <div className="grid grid-cols-[minmax(0,1fr)_40px] items-center gap-2">
-          <EntrantCell entrant={match.away} />
-          <span className="text-right font-black text-[14px]">{match.awayScore === null ? "—" : match.awayScore}</span>
-        </div>
-      </div>
-
-      <div className="mt-2 pt-2 border-t border-gray-100 flex items-center justify-between gap-2">
-        <span className="text-[11px] font-bold text-muted-foreground">{knockoutScoreText(match)}</span>
-        <span
-          className={`text-[10px] font-extrabold uppercase rounded-full px-2 py-0.5 border ${
-            scoredMatch(match.actual) || match.status === "SCORED" || match.status === "FINISHED"
-              ? "bg-[#E8F5E9] text-[#2F7D5C] border-[#C8E6C9]"
-              : "bg-gray-50 text-gray-500 border-gray-200"
-          }`}
-        >
-          {match.status}
-        </span>
-      </div>
-    </article>
-  );
 
   return (
     <NavigationShell>
@@ -684,42 +766,11 @@ export default function StandingsPage() {
                 </span>
               </div>
 
-              <div className="overflow-auto p-4">
-                <div className="grid grid-cols-[300px_300px_300px_300px_300px] gap-5 min-w-[1580px]">
-                  {BRACKET_COLUMNS.map((column) => (
-                    <div key={column.shortLabel} className="space-y-3">
-                      <div className="h-8 flex items-center justify-between bg-[#8A1538] text-white rounded px-3">
-                        <h4 className="text-[12px] font-black uppercase">{language === "vi" ? column.labelVi : column.labelEn}</h4>
-                        <span className="text-[10px] font-extrabold opacity-80">{column.shortLabel}</span>
-                      </div>
-
-                      <div style={{ paddingTop: column.paddingTop, display: "grid", gap: column.gap }}>
-                        {column.matchNos.map((matchNo) => {
-                          const match = knockoutMatchesByNo.get(matchNo);
-                          return match ? renderKnockoutMatch(match, matchNo === 104) : null;
-                        })}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+              <div className="p-4">
+                <KnockoutBracket knockoutMatchesByNo={knockoutMatchesByNo} language={language} />
               </div>
             </article>
 
-            <article className="kp-card" style={{ padding: 0, overflow: "hidden" }}>
-              <div className="px-5 py-4 border-b border-gray-100">
-                <h3 className="text-[16px] font-bold">{t("thirdPlaceTitle")}</h3>
-                <p className="text-[12px] text-muted-foreground mt-0.5">
-                  {t("thirdPlaceDesc")}
-                </p>
-              </div>
-
-              <div className="max-w-[360px] p-4">
-                {(() => {
-                  const match = knockoutMatchesByNo.get(103);
-                  return match ? renderKnockoutMatch(match) : null;
-                })()}
-              </div>
-            </article>
           </div>
         </section>
       )}

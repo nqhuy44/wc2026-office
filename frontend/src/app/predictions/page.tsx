@@ -54,13 +54,15 @@ export default function PredictionsPage() {
   const pendingCount = predicted.filter(m => m.myPrediction?.resultType === "PENDING").length;
   const totalPts = scored.reduce((s, m) => s + (m.myPrediction?.points ?? 0), 0);
 
-  const filtered = predicted.filter(m => {
-    if (filter === "exact") return m.myPrediction?.resultType === "EXACT_SCORE";
-    if (filter === "correct") return m.myPrediction?.resultType === "CORRECT_RESULT";
-    if (filter === "wrong") return m.myPrediction?.resultType === "WRONG";
-    if (filter === "pending") return m.myPrediction?.resultType === "PENDING";
-    return true;
-  });
+  const filtered = predicted
+    .filter(m => {
+      if (filter === "exact") return m.myPrediction?.resultType === "EXACT_SCORE";
+      if (filter === "correct") return m.myPrediction?.resultType === "CORRECT_RESULT";
+      if (filter === "wrong") return m.myPrediction?.resultType === "WRONG";
+      if (filter === "pending") return m.myPrediction?.resultType === "PENDING";
+      return true;
+    })
+    .sort((a, b) => new Date(b.match.kickoffAt).getTime() - new Date(a.match.kickoffAt).getTime());
 
   return (
     <NavigationShell>
