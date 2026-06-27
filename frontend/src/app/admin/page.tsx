@@ -562,9 +562,16 @@ function AdminPageContent() {
   const scoreRows = matches.filter(
     (lm) => isManualScoreEligible(lm)
   );
-  const predictionReviewMatches = matches.filter(
-    (lm) => lm.isPredictionEnabled && !["SCHEDULED", "VOID"].includes(lm.status)
-  );
+  const predictionReviewMatches = matches
+    .filter((lm) => lm.isPredictionEnabled && !["SCHEDULED", "VOID"].includes(lm.status))
+    .sort((a, b) => {
+      const order = (s: string) => (["OPEN", "LOCKED", "LIVE"].includes(s) ? 0 : 1);
+      const oa = order(a.status), ob = order(b.status);
+      if (oa !== ob) return oa - ob;
+      const ta = new Date(a.match.kickoffAt).getTime();
+      const tb = new Date(b.match.kickoffAt).getTime();
+      return oa === 0 ? ta - tb : tb - ta;
+    });
   const selectedPredictionMatchHasStarted = selectedPredictionMatch
     ? ["LIVE", "FINISHED", "SCORED", "VOID"].includes(selectedPredictionMatch.status) ||
       new Date(selectedPredictionMatch.match.kickoffAt).getTime() <= now
