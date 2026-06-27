@@ -58,7 +58,7 @@ interface LeagueMatch {
   id: string;
   status: string;
   isPredictionEnabled: boolean;
-  pointMultiplier: number;
+  isBonus: boolean;
   lockAt: string | null;
   match: Match;
 }
@@ -80,6 +80,7 @@ interface AdminPrediction {
   id: string;
   homeScorePred: number;
   awayScorePred: number;
+  isHopeStar: boolean;
   points: number;
   resultType: string;
   createdAt: string;
@@ -192,15 +193,15 @@ function AdminPageContent() {
   const KNOCKOUT_STAGES = ["ROUND_OF_32", "ROUND_OF_16", "QUARTER_FINAL", "SEMI_FINAL", "THIRD_PLACE", "FINAL"];
   const isKnockout = (stage: string) => KNOCKOUT_STAGES.includes(stage);
 
-  const handleSetMultiplier = async (leagueMatchId: string, multiplier: number) => {
+  const handleToggleBonus = async (leagueMatchId: string, isBonus: boolean) => {
     setSettingMultiplierId(leagueMatchId);
     try {
-      await apiClient<{ leagueMatch: LeagueMatch }>(`/admin/league-matches/${leagueMatchId}/point-multiplier`, {
+      await apiClient<{ leagueMatch: LeagueMatch }>(`/admin/league-matches/${leagueMatchId}/toggle-bonus`, {
         method: "PUT",
-        json: { multiplier },
+        json: { isBonus },
       });
       setMatches((prev) =>
-        prev.map((m) => m.id === leagueMatchId ? { ...m, pointMultiplier: multiplier } : m)
+        prev.map((m) => m.id === leagueMatchId ? { ...m, isBonus } : m)
       );
     } catch (err: any) {
       alert(err.code ? t(err.code as any) : t("errUnknown"));
@@ -951,6 +952,7 @@ function AdminPageContent() {
                       <col />
                       <col className="w-[160px]" />
                       <col className="w-[180px]" />
+                      <col className="w-[110px]" />
                       <col className="w-[210px]" />
                     </colgroup>
                     <thead>
@@ -959,6 +961,7 @@ function AdminPageContent() {
                         <th className="px-6 py-4">{t("matchInfo")}</th>
                         <th className="px-6 py-4 text-center">{t("kickoff")}</th>
                         <th className="px-6 py-4 text-center">{t("predictionStatus")}</th>
+                        <th className="px-6 py-4 text-center">{t("bonusMatchLabel")}</th>
                         <th className="px-6 py-4 text-right pr-8">{t("colActions")}</th>
                       </tr>
                     </thead>
@@ -1056,6 +1059,31 @@ function AdminPageContent() {
                                     </span>
                                   )}
                                 </div>
+                              </td>
+                              <td className="px-6 py-4 text-center">
+                                {isKnockout(lm.match.stage) ? (
+                                  isTerminal || isLocked ? (
+                                    lm.isBonus ? (
+                                      <span className="text-[10px] font-extrabold bg-amber-100 text-amber-700 border border-amber-300 px-2 py-0.5 rounded">BONUS</span>
+                                    ) : (
+                                      <span className="text-[11px] text-muted-foreground">—</span>
+                                    )
+                                  ) : (
+                                    <button
+                                      onClick={() => handleToggleBonus(lm.id, !lm.isBonus)}
+                                      disabled={settingMultiplierId === lm.id}
+                                      className={`px-3 py-1 rounded-lg text-[11px] font-extrabold border transition-all disabled:opacity-50 ${
+                                        lm.isBonus
+                                          ? "border-amber-400 bg-amber-50 text-amber-800 hover:bg-amber-100"
+                                          : "border-border bg-white text-muted-foreground hover:bg-gray-50"
+                                      }`}
+                                    >
+                                      {lm.isBonus ? t("bonusOn") : t("bonusOff")}
+                                    </button>
+                                  )
+                                ) : (
+                                  <span className="text-[11px] text-muted-foreground">—</span>
+                                )}
                               </td>
                               <td className="px-6 py-4 text-right pr-8">
                                 {isTerminal || (!canTogglePrediction && !canUnlockPrediction) ? (
@@ -1162,85 +1190,6 @@ function AdminPageContent() {
               )}
             </article>
 
-            {/* ─── Knockout Point Multiplier ─── */}
-            {matches.some((lm) => isKnockout(lm.match.stage)) && (
-              <article className="bg-card border border-border rounded-lg shadow-[0_12px_30px_rgba(31,41,55,0.08)] overflow-hidden bg-white">
-                <div className="p-6 border-b border-border bg-[linear-gradient(180deg,rgba(47,125,92,0.02),transparent)]">
-                  <h3 className="text-[17px] font-bold text-foreground mb-1">
-                    ✨ {t("knockoutDoublePointsTitle")}
-                  </h3>
-                  <p className="text-muted-foreground text-[13px] mt-0.5">
-                    {t("knockoutDoublePointsSub")}
-                  </p>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[620px] text-left border-collapse text-[13px]">
-                    <thead>
-                      <tr className="border-b border-border bg-gray-50 text-muted-foreground font-extrabold uppercase tracking-wider text-[11px]">
-                        <th className="px-6 py-4">{t("stage")}</th>
-                        <th className="px-6 py-4">{t("matchInfo")}</th>
-                        <th className="px-6 py-4 text-center">{t("predictionStatus")}</th>
-                        <th className="px-6 py-4 text-right pr-8">{t("pointMultiplierLabel")}</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border">
-                      {matches
-                        .filter((lm) => isKnockout(lm.match.stage))
-                        .sort((a, b) => new Date(a.match.kickoffAt).getTime() - new Date(b.match.kickoffAt).getTime())
-                        .map((lm) => (
-                          <tr key={lm.id} className="hover:bg-[#fcfbf7] transition-all">
-                            <td className="px-6 py-4 text-muted-foreground font-semibold text-[11px] uppercase tracking-wider">
-                              {stageLabel(lm.match.stage, lm.match.groupName)}
-                            </td>
-                            <td className="px-6 py-4 font-bold text-foreground">
-                              <div className="flex items-center gap-2">
-                                <TeamLogo team={lm.match.homeTeam} />
-                                <span className="truncate">{lm.match.homeTeam.name}</span>
-                                <span className="text-muted-foreground font-normal text-[11px]">vs</span>
-                                <TeamLogo team={lm.match.awayTeam} />
-                                <span className="truncate">{lm.match.awayTeam.name}</span>
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 text-center">
-                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full border text-[11px] font-extrabold uppercase ${
-                                lm.status === "SCORED"
-                                  ? "border-primary/20 bg-[#E8F5E9] text-[#2F7D5C]"
-                                  : lm.status === "OPEN"
-                                    ? "border-green-200 bg-green-50 text-green-700"
-                                    : "border-gray-200 bg-gray-50 text-gray-500"
-                              }`}>
-                                {lm.status === "SCORED" ? t("processed") : lm.status === "OPEN" ? t("predictionOpen") : lm.status}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 text-right pr-8">
-                              <div className="inline-flex items-center gap-1.5 justify-end">
-                                {([1, 2, 3] as const).map((val) => (
-                                  <button
-                                    key={val}
-                                    onClick={() => lm.pointMultiplier !== val && handleSetMultiplier(lm.id, val)}
-                                    disabled={settingMultiplierId === lm.id}
-                                    className={`min-w-[52px] px-3 py-1.5 rounded-lg text-[12px] font-extrabold border transition-all disabled:opacity-50 ${
-                                      lm.pointMultiplier === val
-                                        ? val === 1
-                                          ? "border-gray-300 bg-gray-100 text-gray-700"
-                                          : val === 2
-                                            ? "border-[#2F7D5C] bg-[#E8F5E9] text-[#2F7D5C]"
-                                            : "border-amber-400 bg-amber-50 text-amber-800"
-                                        : "border-border bg-white text-muted-foreground hover:bg-gray-50"
-                                    }`}
-                                  >
-                                    x{val}
-                                  </button>
-                                ))}
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                    </tbody>
-                  </table>
-                </div>
-              </article>
-            )}
           </div>
         )}
 
@@ -1277,16 +1226,21 @@ function AdminPageContent() {
                       {predictionReviewMatches.map((lm) => {
                         const kickoff = new Date(lm.match.kickoffAt);
                         return (
-                          <tr key={lm.id} className="hover:bg-[#fcfbf7] transition-all">
+                          <tr key={lm.id} className={`transition-all ${lm.isBonus ? "bg-amber-50/40 hover:bg-amber-50/60" : "hover:bg-[#fcfbf7]"}`}>
                             <td className="px-6 py-4 text-muted-foreground font-semibold text-[11px] uppercase tracking-wider">
                               {stageLabel(lm.match.stage, lm.match.groupName)}
                             </td>
                             <td className="px-6 py-4">
-                              <div className="grid grid-cols-[28px_minmax(0,1fr)_28px_minmax(0,1fr)] items-center gap-2 min-w-[420px]">
-                                <TeamLogo team={lm.match.homeTeam} />
-                                <span className="font-bold text-foreground truncate">{lm.match.homeTeam.name}</span>
-                                <TeamLogo team={lm.match.awayTeam} />
-                                <span className="font-bold text-foreground truncate">{lm.match.awayTeam.name}</span>
+                              <div className="flex flex-col gap-1">
+                                <div className="grid grid-cols-[28px_minmax(0,1fr)_28px_minmax(0,1fr)] items-center gap-2 min-w-[420px]">
+                                  <TeamLogo team={lm.match.homeTeam} />
+                                  <span className="font-bold text-foreground truncate">{lm.match.homeTeam.name}</span>
+                                  <TeamLogo team={lm.match.awayTeam} />
+                                  <span className="font-bold text-foreground truncate">{lm.match.awayTeam.name}</span>
+                                </div>
+                                {lm.isBonus && (
+                                  <span className="text-[10px] font-extrabold bg-amber-100 text-amber-700 border border-amber-300 px-1.5 py-0.5 rounded w-fit">BONUS</span>
+                                )}
                               </div>
                             </td>
                             <td className="px-6 py-4 text-center">
@@ -1331,8 +1285,11 @@ function AdminPageContent() {
                 <div className="w-full max-w-[860px] bg-white border border-border rounded-lg p-6 shadow-[0_24px_50px_rgba(31,41,55,0.16)] flex flex-col max-h-[90vh]">
                   <div className="flex items-start justify-between border-b border-border pb-3 mb-4 gap-4">
                     <div>
-                      <h3 className="text-[17px] font-bold text-foreground">
+                      <h3 className="text-[17px] font-bold text-foreground flex items-center gap-2">
                         {t("adminPredictionModalTitle")}
+                        {selectedPredictionMatch.isBonus && (
+                          <span className="text-[11px] font-extrabold bg-amber-100 text-amber-700 border border-amber-300 px-2 py-0.5 rounded">BONUS</span>
+                        )}
                       </h3>
                       <p className="text-muted-foreground text-[13px] mt-0.5">
                         {selectedPredictionMatch.match.homeTeam.name} vs {selectedPredictionMatch.match.awayTeam.name}
@@ -1352,7 +1309,7 @@ function AdminPageContent() {
                     </div>
                   ) : (
                     <div className="overflow-y-auto flex-1 pr-1 space-y-5">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="grid grid-cols-3 gap-3">
                         <div className="rounded-lg border border-green-100 bg-green-50 px-4 py-3">
                           <div className="text-[11px] font-extrabold uppercase tracking-wider text-green-700">
                             {t("adminPredictedCount")}
@@ -1367,6 +1324,14 @@ function AdminPageContent() {
                           </div>
                           <div className="text-[24px] font-black text-foreground mt-1">
                             {missingPredictionMembers.length}
+                          </div>
+                        </div>
+                        <div className="rounded-lg border border-yellow-200 bg-yellow-50 px-4 py-3">
+                          <div className="text-[11px] font-extrabold uppercase tracking-wider text-yellow-700">
+                            {t("hopeStarLabel")}
+                          </div>
+                          <div className="text-[24px] font-black text-foreground mt-1">
+                            {adminPredictions.filter(p => p.isHopeStar).length}
                           </div>
                         </div>
                       </div>
@@ -1386,19 +1351,29 @@ function AdminPageContent() {
                                 <tr className="border-b border-border bg-gray-50 text-muted-foreground font-extrabold uppercase tracking-wider text-[11px]">
                                   <th className="px-4 py-3">{t("colAccount")}</th>
                                   <th className="px-4 py-3 text-center">{t("theirPickCol")}</th>
+                                  <th className="px-4 py-3 text-center">⭐</th>
                                   <th className="px-4 py-3 text-center">{t("statusCol")}</th>
                                   <th className="px-4 py-3 text-right">{t("pointsCol")}</th>
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-border">
                                 {adminPredictions.map((prediction) => (
-                                  <tr key={prediction.id} className="hover:bg-[#fcfbf7]">
+                                  <tr key={prediction.id} className={`hover:bg-[#fcfbf7] ${prediction.isHopeStar ? "bg-yellow-50/50" : ""}`}>
                                     <td className="px-4 py-3">
                                       <div className="font-bold text-foreground">{prediction.member.nickname}</div>
                                       <div className="text-[11px] text-muted-foreground">@{prediction.member.username} · {prediction.member.displayName}</div>
                                     </td>
                                     <td className="px-4 py-3 text-center font-black text-foreground">
                                       {prediction.homeScorePred} - {prediction.awayScorePred}
+                                    </td>
+                                    <td className="px-4 py-3 text-center">
+                                      {prediction.isHopeStar ? (
+                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold border border-yellow-300 bg-yellow-100 text-yellow-800">
+                                          {t("hopeStarLabel")}
+                                        </span>
+                                      ) : (
+                                        <span className="text-[11px] text-muted-foreground">—</span>
+                                      )}
                                     </td>
                                     <td className="px-4 py-3 text-center">
                                       <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-extrabold border ${

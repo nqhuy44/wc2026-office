@@ -12,7 +12,7 @@ import TeamLogo from "@/components/team-logo";
 interface Team { id: string; name: string; shortName: string; flagUrl: string; }
 interface Match { id: string; stage: string; groupName: string | null; kickoffAt: string; homeScore: number | null; awayScore: number | null; homeTeam: Team; awayTeam: Team; }
 interface LeagueMatch {
-  id: string; status: string; isPredictionEnabled: boolean; pointMultiplier: number; lockAt: string; match: Match;
+  id: string; status: string; isPredictionEnabled: boolean; isBonus: boolean; lockAt: string; match: Match;
   myPrediction: { homeScorePred: number; awayScorePred: number; isHopeStar: boolean; points: number; resultType: string; } | null;
 }
 
@@ -153,7 +153,7 @@ function MatchesContent() {
                 const hasPick = lm.myPrediction !== null;
                 const pred = lm.myPrediction;
                 const hasHopeStar = pred?.isHopeStar ?? false;
-                const hasX2 = lm.pointMultiplier > 1;
+                const hasBonus = lm.isBonus;
 
                 const badgeClass = isLive ? 'kp-badge-live' : isOpen ? 'kp-badge-open' : isScored ? 'kp-badge-scored' : isVoid ? 'kp-badge-void' : 'kp-badge-upcoming';
                 const badgeLabel = isLive ? t("matchLive") : isOpen ? "OPEN" : isScored ? t("statusScored") : isVoid ? "VOID" : isLocked ? "LOCKED" : t("statusUpcoming");
@@ -162,15 +162,18 @@ function MatchesContent() {
                   <div
                     key={lm.id}
                     className={`kp-card ${isVoid ? 'opacity-60' : ''}`}
-                    style={{ borderLeft: isLive ? '3px solid #DC2626' : isScored ? '3px solid #2563EB' : undefined }}
+                    style={{
+                      borderLeft: isLive ? '3px solid #DC2626' : isScored ? '3px solid #2563EB' : hasBonus ? '3px solid #f59e0b' : undefined,
+                      background: hasBonus && !isLive && !isScored ? 'linear-gradient(180deg,#fffbeb 0%,#ffffff 50%)' : undefined
+                    }}
                   >
                     {/* Meta */}
                     <div className="flex items-center justify-between mb-3.5">
                       <span className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
                         {stageLabel(lm.match.stage, lm.match.groupName)}
-                        {hasX2 && (
+                        {hasBonus && (
                           <span className="text-[10px] font-extrabold bg-amber-100 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded">
-                            x{lm.pointMultiplier}
+                            BONUS
                           </span>
                         )}
                       </span>
@@ -216,12 +219,14 @@ function MatchesContent() {
                           <div className="text-[13px] text-muted-foreground italic mt-0.5">{t("notPredictedYet")}</div>
                         )}
                         {hasPick && pred && (
-                          <div className="text-[13px] mt-0.5 flex items-center gap-1">
-                            <span className="text-muted-foreground">{t("yourPickLabel")}</span>
-                            <span className="font-bold text-foreground">{pred.homeScorePred}–{pred.awayScorePred}</span>
-                            {hasHopeStar && <span className="text-amber-500 text-[12px]">⭐</span>}
+                          <div className="mt-0.5 flex flex-wrap items-center gap-1">
+                            <span className="text-[13px] text-muted-foreground">{t("yourPickLabel")}</span>
+                            <span className="text-[13px] font-bold text-foreground">{pred.homeScorePred}–{pred.awayScorePred}</span>
+                            {hasHopeStar && (
+                              <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded border border-yellow-300 bg-yellow-100 text-yellow-800">{t("hopeStarLabel")}</span>
+                            )}
                             {isScored && (
-                              <span className={`ml-0.5 font-bold ${pred.resultType === 'EXACT_SCORE' ? 'text-success' : pred.resultType === 'CORRECT_RESULT' ? 'text-blue-dark' : 'text-red-400'}`}>
+                              <span className={`text-[13px] ml-0.5 font-bold ${pred.resultType === 'EXACT_SCORE' ? 'text-success' : pred.resultType === 'CORRECT_RESULT' ? 'text-blue-dark' : 'text-red-400'}`}>
                                 {pred.points >= 0 ? '+' : ''}{pred.points} {t("pointsWord")} {pred.resultType === 'EXACT_SCORE' ? '✅' : pred.resultType === 'CORRECT_RESULT' ? '✓' : '✗'}
                               </span>
                             )}

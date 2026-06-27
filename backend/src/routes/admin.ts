@@ -341,6 +341,7 @@ export async function adminRoutes(app: FastifyInstance) {
         id: prediction.id,
         homeScorePred: prediction.homeScorePred,
         awayScorePred: prediction.awayScorePred,
+        isHopeStar: prediction.isHopeStar,
         points: prediction.points,
         resultType: prediction.resultType,
         createdAt: prediction.createdAt,
@@ -661,12 +662,12 @@ export async function adminRoutes(app: FastifyInstance) {
     return { message: "Đã xác nhận sửa tỉ số và chấm điểm lại thành công!" };
   });
 
-  // ─── Point Multiplier (x2 for knockout matches) ───
+  // ─── Bonus match toggle (knockout matches only) ───
 
-  app.put("/admin/league-matches/:leagueMatchId/point-multiplier", { preHandler: [app.requireAdmin] }, async (request, reply) => {
+  app.put("/admin/league-matches/:leagueMatchId/toggle-bonus", { preHandler: [app.requireAdmin] }, async (request, reply) => {
     const { leagueMatchId } = request.params as { leagueMatchId: string };
     const leagueId = request.leagueMember!.leagueId;
-    const { multiplier } = z.object({ multiplier: z.number().int().min(1).max(3) }).parse(request.body);
+    const { isBonus } = z.object({ isBonus: z.boolean() }).parse(request.body);
 
     const leagueMatch = await prisma.leagueMatch.findFirst({
       where: { id: leagueMatchId, leagueId },
@@ -684,10 +685,10 @@ export async function adminRoutes(app: FastifyInstance) {
 
     const updated = await prisma.leagueMatch.update({
       where: { id: leagueMatchId },
-      data: { pointMultiplier: multiplier }
+      data: { isBonus }
     });
 
-    return { leagueMatch: updated, message: `Đã cập nhật hệ số điểm x${multiplier}` };
+    return { leagueMatch: updated, message: isBonus ? "Đã bật điểm bonus cho trận này" : "Đã tắt điểm bonus" };
   });
 
   // ─── Settings Management ───

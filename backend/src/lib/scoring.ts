@@ -14,22 +14,28 @@ function resolveEffectiveScore(match: {
 }
 
 // Points formula:
-//   m = pointMultiplier (1, 2, 3...)
-//   h = isHopeStar
+//   Base:     exact=+3, correct=+1, wrong=0
+//   HopeStar: base×2 (wrong=-2) → exact=+6, correct=+2, wrong=-2
+//   Bonus:    adds exact=+3, correct=+2, wrong=+0 on top of the above
 //
-// Without HS: exact = 3m,      correct = m,    wrong = 0
-// With HS:    exact = 3(m+1),  correct = 2m-1, wrong = -3m
-//
-// Verified: m=1 HS → 6, 1, -3 | m=2 HS → 9, 3, -6
-function computePoints(resultType: string, multiplier: number, isHopeStar: boolean): number {
-  if (!isHopeStar) {
-    if (resultType === "EXACT_SCORE") return 3 * multiplier;
-    if (resultType === "CORRECT_RESULT") return multiplier;
-    return 0;
-  }
-  if (resultType === "EXACT_SCORE") return 3 * (multiplier + 1);
-  if (resultType === "CORRECT_RESULT") return 2 * multiplier - 1;
-  return -3 * multiplier;
+// Examples:
+//   Normal:           3 / 1 / 0
+//   Bonus only:       6 / 3 / 0
+//   HopeStar only:    6 / 2 / -2
+//   HopeStar+Bonus:   9 / 4 / -2
+function computePoints(resultType: string, isBonus: boolean, isHopeStar: boolean): number {
+  const isExact   = resultType === "EXACT_SCORE";
+  const isCorrect = resultType === "CORRECT_RESULT";
+
+  // Hope star: doubles base, wrong=-2
+  const hsPoints = isHopeStar
+    ? (isExact ? 6 : isCorrect ? 2 : -2)
+    : (isExact ? 3 : isCorrect ? 1 : 0);
+
+  // Bonus: flat additive (no effect on wrong)
+  const bonusPoints = isBonus ? (isExact ? 3 : isCorrect ? 2 : 0) : 0;
+
+  return hsPoints + bonusPoints;
 }
 
 export async function scoreMatch(matchId: string) {
@@ -81,8 +87,6 @@ export async function scoreMatch(matchId: string) {
       if (actualHome > actualAway) matchWinner = "HOME";
       if (actualHome < actualAway) matchWinner = "AWAY";
 
-      const multiplier = lm.pointMultiplier ?? 1;
-
       for (const pred of lm.predictions) {
         const predHome = pred.homeScorePred;
         const predAway = pred.awayScorePred;
@@ -97,7 +101,7 @@ export async function scoreMatch(matchId: string) {
           resultType = "CORRECT_RESULT";
         }
 
-        const points = computePoints(resultType, multiplier, pred.isHopeStar);
+        const points = computePoints(resultType, lm.isBonus, pred.isHopeStar);
 
         await tx.prediction.update({
           where: { id: pred.id },

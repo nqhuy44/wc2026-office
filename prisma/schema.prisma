@@ -210,7 +210,7 @@ model LeagueMatch {
   matchId             String
   status              MatchStatus  @default(SCHEDULED)
   isPredictionEnabled Boolean      @default(false)
-  pointMultiplier     Int          @default(1)
+  isBonus             Boolean      @default(false)
   lockAt              DateTime?
   openedAt            DateTime?
   createdAt           DateTime     @default(now())

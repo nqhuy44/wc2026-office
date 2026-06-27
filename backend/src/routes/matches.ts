@@ -44,7 +44,7 @@ export async function matchRoutes(app: FastifyInstance) {
       id: lm.id,
       status: lm.status,
       isPredictionEnabled: lm.isPredictionEnabled,
-      pointMultiplier: lm.pointMultiplier,
+      isBonus: lm.isBonus,
       lockAt: lm.lockAt,
       match: {
         id: lm.match.id,
