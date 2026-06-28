@@ -134,8 +134,8 @@ const BKT_COL_GAP = 48;   // gap between columns (connector area)
 const BKT_TOTAL_H = 16 * BKT_SLOT; // 2016px
 
 const BRACKET_ROUND_DEFS = [
-  { labelVi: "Round of 32",  labelEn: "Round of 32",    matchNos: [74, 77, 73, 75, 83, 84, 81, 82, 76, 78, 79, 80, 86, 88, 85, 87] },
-  { labelVi: "Vòng 16 đội",  labelEn: "Round of 16",    matchNos: [89, 90, 93, 94, 91, 92, 95, 96] },
+  { labelVi: "Round of 32",  labelEn: "Round of 32",    matchNos: [73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88] },
+  { labelVi: "Vòng 16 đội",  labelEn: "Round of 16",    matchNos: [89, 90, 91, 92, 93, 94, 95, 96] },
   { labelVi: "Tứ kết",       labelEn: "Quarter-finals",  matchNos: [97, 98, 99, 100] },
   { labelVi: "Bán kết",      labelEn: "Semi-finals",     matchNos: [101, 102] },
   { labelVi: "Chung kết",    labelEn: "Final",           matchNos: [104] },
@@ -157,8 +157,9 @@ function bktColLeft(ci: number): number {
 
 function BracketCard({ match, language }: { match: ResolvedKnockoutMatch; language: string }) {
   const scored = match.homeScore !== null && match.awayScore !== null;
-  const homeWon = match.winner === "HOME" || (match.winner === "UNKNOWN" && scored && match.homeScore! > match.awayScore!);
-  const awayWon = match.winner === "AWAY" || (match.winner === "UNKNOWN" && scored && match.awayScore! > match.homeScore!);
+  const _side = scored ? resolveActualWinner(match) : undefined;
+  const homeWon = _side === "home";
+  const awayWon = _side === "away";
 
   const hasET  = match.extraTimeHome !== null && match.extraTimeAway !== null;
   const hasPen = match.penaltiesHome !== null && match.penaltiesAway !== null;
@@ -335,38 +336,42 @@ const winner = (matchNo: number): EntrantRef => ({ kind: "winner", matchNo, labe
 const loser = (matchNo: number): EntrantRef => ({ kind: "loser", matchNo, label: `L${matchNo}` });
 
 const KNOCKOUT_TEMPLATES: KnockoutTemplate[] = [
-  { no: 73, stage: "ROUND_OF_32", label: "Match 73", shortLabel: "M73", home: groupRank(2, "A"), away: groupRank(2, "B") },
-  { no: 74, stage: "ROUND_OF_32", label: "Match 74", shortLabel: "M74", home: groupRank(1, "E"), away: thirdPlace(["A", "B", "C", "D", "F"]) },
-  { no: 75, stage: "ROUND_OF_32", label: "Match 75", shortLabel: "M75", home: groupRank(1, "F"), away: groupRank(2, "C") },
-  { no: 76, stage: "ROUND_OF_32", label: "Match 76", shortLabel: "M76", home: groupRank(1, "C"), away: groupRank(2, "F") },
-  { no: 77, stage: "ROUND_OF_32", label: "Match 77", shortLabel: "M77", home: groupRank(1, "I"), away: thirdPlace(["C", "D", "F", "G", "H"]) },
-  { no: 78, stage: "ROUND_OF_32", label: "Match 78", shortLabel: "M78", home: groupRank(2, "E"), away: groupRank(2, "I") },
-  { no: 79, stage: "ROUND_OF_32", label: "Match 79", shortLabel: "M79", home: groupRank(1, "A"), away: thirdPlace(["C", "E", "F", "H", "I"]) },
-  { no: 80, stage: "ROUND_OF_32", label: "Match 80", shortLabel: "M80", home: groupRank(1, "L"), away: thirdPlace(["E", "H", "I", "J", "K"]) },
-  { no: 81, stage: "ROUND_OF_32", label: "Match 81", shortLabel: "M81", home: groupRank(1, "D"), away: thirdPlace(["B", "E", "F", "I", "J"]) },
-  { no: 82, stage: "ROUND_OF_32", label: "Match 82", shortLabel: "M82", home: groupRank(1, "G"), away: thirdPlace(["A", "E", "H", "I", "J"]) },
-  { no: 83, stage: "ROUND_OF_32", label: "Match 83", shortLabel: "M83", home: groupRank(2, "K"), away: groupRank(2, "L") },
-  { no: 84, stage: "ROUND_OF_32", label: "Match 84", shortLabel: "M84", home: groupRank(1, "H"), away: groupRank(2, "J") },
-  { no: 85, stage: "ROUND_OF_32", label: "Match 85", shortLabel: "M85", home: groupRank(1, "B"), away: thirdPlace(["E", "F", "G", "I", "J"]) },
-  { no: 86, stage: "ROUND_OF_32", label: "Match 86", shortLabel: "M86", home: groupRank(1, "J"), away: groupRank(2, "H") },
-  { no: 87, stage: "ROUND_OF_32", label: "Match 87", shortLabel: "M87", home: groupRank(1, "K"), away: thirdPlace(["D", "E", "I", "J", "L"]) },
-  { no: 88, stage: "ROUND_OF_32", label: "Match 88", shortLabel: "M88", home: groupRank(2, "D"), away: groupRank(2, "G") },
-  { no: 89, stage: "ROUND_OF_16", label: "Match 89", shortLabel: "M89", home: winner(74), away: winner(77) },
-  { no: 90, stage: "ROUND_OF_16", label: "Match 90", shortLabel: "M90", home: winner(73), away: winner(75) },
-  { no: 91, stage: "ROUND_OF_16", label: "Match 91", shortLabel: "M91", home: winner(76), away: winner(78) },
+  // R32 — slots 73-88 in kickoff order (provider assigns teams; entrant refs are display labels only)
+  { no: 73, stage: "ROUND_OF_32", label: "Match 73", shortLabel: "M73", home: thirdPlace([]), away: thirdPlace([]) },
+  { no: 74, stage: "ROUND_OF_32", label: "Match 74", shortLabel: "M74", home: thirdPlace([]), away: thirdPlace([]) },
+  { no: 75, stage: "ROUND_OF_32", label: "Match 75", shortLabel: "M75", home: thirdPlace([]), away: thirdPlace([]) },
+  { no: 76, stage: "ROUND_OF_32", label: "Match 76", shortLabel: "M76", home: thirdPlace([]), away: thirdPlace([]) },
+  { no: 77, stage: "ROUND_OF_32", label: "Match 77", shortLabel: "M77", home: thirdPlace([]), away: thirdPlace([]) },
+  { no: 78, stage: "ROUND_OF_32", label: "Match 78", shortLabel: "M78", home: thirdPlace([]), away: thirdPlace([]) },
+  { no: 79, stage: "ROUND_OF_32", label: "Match 79", shortLabel: "M79", home: thirdPlace([]), away: thirdPlace([]) },
+  { no: 80, stage: "ROUND_OF_32", label: "Match 80", shortLabel: "M80", home: thirdPlace([]), away: thirdPlace([]) },
+  { no: 81, stage: "ROUND_OF_32", label: "Match 81", shortLabel: "M81", home: thirdPlace([]), away: thirdPlace([]) },
+  { no: 82, stage: "ROUND_OF_32", label: "Match 82", shortLabel: "M82", home: thirdPlace([]), away: thirdPlace([]) },
+  { no: 83, stage: "ROUND_OF_32", label: "Match 83", shortLabel: "M83", home: thirdPlace([]), away: thirdPlace([]) },
+  { no: 84, stage: "ROUND_OF_32", label: "Match 84", shortLabel: "M84", home: thirdPlace([]), away: thirdPlace([]) },
+  { no: 85, stage: "ROUND_OF_32", label: "Match 85", shortLabel: "M85", home: thirdPlace([]), away: thirdPlace([]) },
+  { no: 86, stage: "ROUND_OF_32", label: "Match 86", shortLabel: "M86", home: thirdPlace([]), away: thirdPlace([]) },
+  { no: 87, stage: "ROUND_OF_32", label: "Match 87", shortLabel: "M87", home: thirdPlace([]), away: thirdPlace([]) },
+  { no: 88, stage: "ROUND_OF_32", label: "Match 88", shortLabel: "M88", home: thirdPlace([]), away: thirdPlace([]) },
+  // R16 — adjacent pairs: slots 1+2→M89, 3+4→M90, 5+6→M91, 7+8→M92, 9+10→M93, 11+12→M94, 13+14→M95, 15+16→M96
+  { no: 89, stage: "ROUND_OF_16", label: "Match 89", shortLabel: "M89", home: winner(73), away: winner(74) },
+  { no: 90, stage: "ROUND_OF_16", label: "Match 90", shortLabel: "M90", home: winner(75), away: winner(76) },
+  { no: 91, stage: "ROUND_OF_16", label: "Match 91", shortLabel: "M91", home: winner(77), away: winner(78) },
   { no: 92, stage: "ROUND_OF_16", label: "Match 92", shortLabel: "M92", home: winner(79), away: winner(80) },
-  { no: 93, stage: "ROUND_OF_16", label: "Match 93", shortLabel: "M93", home: winner(83), away: winner(84) },
-  { no: 94, stage: "ROUND_OF_16", label: "Match 94", shortLabel: "M94", home: winner(81), away: winner(82) },
-  { no: 95, stage: "ROUND_OF_16", label: "Match 95", shortLabel: "M95", home: winner(86), away: winner(88) },
-  { no: 96, stage: "ROUND_OF_16", label: "Match 96", shortLabel: "M96", home: winner(85), away: winner(87) },
-  { no: 97, stage: "QUARTER_FINAL", label: "Match 97", shortLabel: "M97", home: winner(89), away: winner(90) },
-  { no: 98, stage: "QUARTER_FINAL", label: "Match 98", shortLabel: "M98", home: winner(93), away: winner(94) },
-  { no: 99, stage: "QUARTER_FINAL", label: "Match 99", shortLabel: "M99", home: winner(91), away: winner(92) },
+  { no: 93, stage: "ROUND_OF_16", label: "Match 93", shortLabel: "M93", home: winner(81), away: winner(82) },
+  { no: 94, stage: "ROUND_OF_16", label: "Match 94", shortLabel: "M94", home: winner(83), away: winner(84) },
+  { no: 95, stage: "ROUND_OF_16", label: "Match 95", shortLabel: "M95", home: winner(85), away: winner(86) },
+  { no: 96, stage: "ROUND_OF_16", label: "Match 96", shortLabel: "M96", home: winner(87), away: winner(88) },
+  // QF — adjacent R16 pairs
+  { no: 97,  stage: "QUARTER_FINAL", label: "Match 97",  shortLabel: "M97",  home: winner(89), away: winner(90) },
+  { no: 98,  stage: "QUARTER_FINAL", label: "Match 98",  shortLabel: "M98",  home: winner(91), away: winner(92) },
+  { no: 99,  stage: "QUARTER_FINAL", label: "Match 99",  shortLabel: "M99",  home: winner(93), away: winner(94) },
   { no: 100, stage: "QUARTER_FINAL", label: "Match 100", shortLabel: "M100", home: winner(95), away: winner(96) },
-  { no: 101, stage: "SEMI_FINAL", label: "Match 101", shortLabel: "M101", home: winner(97), away: winner(98) },
-  { no: 102, stage: "SEMI_FINAL", label: "Match 102", shortLabel: "M102", home: winner(99), away: winner(100) },
+  // SF
+  { no: 101, stage: "SEMI_FINAL", label: "Match 101", shortLabel: "M101", home: winner(97),  away: winner(98)  },
+  { no: 102, stage: "SEMI_FINAL", label: "Match 102", shortLabel: "M102", home: winner(99),  away: winner(100) },
   { no: 103, stage: "THIRD_PLACE", label: "Match 103", shortLabel: "M103", home: loser(101), away: loser(102) },
-  { no: 104, stage: "FINAL", label: "Match 104", shortLabel: "M104", home: winner(101), away: winner(102) }
+  { no: 104, stage: "FINAL",       label: "Match 104", shortLabel: "M104", home: winner(101), away: winner(102) },
 ];
 
 const TEAM_FLAG_FALLBACK: Record<string, string> = {
@@ -484,19 +489,34 @@ function scoredMatch(match?: LeagueMatch) {
   return Boolean(match && match.match.homeScore !== null && match.match.awayScore !== null);
 }
 
-function getWinner(match: ResolvedKnockoutMatch): ResolvedEntrant | undefined {
-  if (match.winner === "HOME") return match.home;
-  if (match.winner === "AWAY") return match.away;
-  // Fallback for non-knockout (90-min) or before winner field is set
+function resolveActualWinner(match: ResolvedKnockoutMatch): "home" | "away" | undefined {
+  if (match.winner === "HOME") return "home";
+  if (match.winner === "AWAY") return "away";
+  // winner field may be "DRAW" for old data (scored before the fix) — derive from scores
+  if (match.penaltiesHome !== null && match.penaltiesAway !== null) {
+    if (match.penaltiesHome > match.penaltiesAway) return "home";
+    if (match.penaltiesHome < match.penaltiesAway) return "away";
+  }
+  if (match.extraTimeHome !== null && match.extraTimeAway !== null) {
+    if (match.extraTimeHome > match.extraTimeAway) return "home";
+    if (match.extraTimeHome < match.extraTimeAway) return "away";
+  }
   if (match.homeScore === null || match.awayScore === null || match.homeScore === match.awayScore) return undefined;
-  return match.homeScore > match.awayScore ? match.home : match.away;
+  return match.homeScore > match.awayScore ? "home" : "away";
+}
+
+function getWinner(match: ResolvedKnockoutMatch): ResolvedEntrant | undefined {
+  const side = resolveActualWinner(match);
+  if (side === "home") return match.home;
+  if (side === "away") return match.away;
+  return undefined;
 }
 
 function getLoser(match: ResolvedKnockoutMatch): ResolvedEntrant | undefined {
-  if (match.winner === "HOME") return match.away;
-  if (match.winner === "AWAY") return match.home;
-  if (match.homeScore === null || match.awayScore === null || match.homeScore === match.awayScore) return undefined;
-  return match.homeScore > match.awayScore ? match.away : match.home;
+  const side = resolveActualWinner(match);
+  if (side === "home") return match.away;
+  if (side === "away") return match.home;
+  return undefined;
 }
 
 export default function StandingsPage() {
@@ -565,112 +585,35 @@ export default function StandingsPage() {
   }, [groups, providerStandings]);
 
   const knockoutByRound = useMemo(() => {
-    const actualMatchesByStage = KNOCKOUT_ROUNDS.reduce<Record<string, LeagueMatch[]>>((acc, round) => {
-      acc[round.key] = matches
-        .filter((lm) => lm.match.stage === round.key)
-        .sort((a, b) => new Date(a.match.kickoffAt).getTime() - new Date(b.match.kickoffAt).getTime());
-      return acc;
-    }, {});
-
-    const groupIsComplete = (group: string) => {
-      const rows = providerStandings[group];
-      return Boolean(rows && rows.length === 4 && rows.every((row) => row.mp >= 3));
-    };
-
-    // Phase 1: assign actual DB matches to template slots.
-    // Primary: match by team ID when projected teams are known (accurate once real teams assigned).
-    // Fallback: sequential by kickoff time (covers TBD phase before group stage ends).
+    // Match actual DB matches to template slots by provider's externalMatchId order.
+    // Football-data.org assigns sequential IDs to WC matches (match 73 in bracket = 73rd-lowest ID).
+    // Sorting by externalMatchId gives the correct bracket slot order without depending on standings.
     const actualByNo = new Map<number, LeagueMatch>();
-    // projResolvedByNo tracks projected data so later rounds can resolve winners from earlier ones.
-    const projResolvedByNo = new Map<number, ResolvedKnockoutMatch>();
-
-    const projTeam = (ref: EntrantRef): Team | undefined => {
-      if (ref.kind === "groupRank") {
-        return groupIsComplete(ref.group) ? groupStandings[ref.group]?.[ref.rank - 1]?.team : undefined;
-      }
-      if (ref.kind === "winner" || ref.kind === "loser") {
-        const src = projResolvedByNo.get(ref.matchNo);
-        if (!src) return undefined;
-        return (ref.kind === "winner" ? getWinner(src) : getLoser(src))?.team;
-      }
-      return undefined; // thirdPlace: unknown until bracket is set
-    };
 
     for (const round of KNOCKOUT_ROUNDS) {
-      const stageActuals = actualMatchesByStage[round.key] ?? [];
-      const stageTemplates = KNOCKOUT_TEMPLATES.filter((t) => t.stage === round.key);
-      const usedIds = new Set<string>();
+      // Within each stage, sort by externalMatchId: provider assigns IDs sequentially
+      // per bracket slot (R32: 537415-537430, R16: 537375-537382, etc.)
+      // Cross-stage IDs are NOT comparable; we filter by stage first so it's safe.
+      const stageActuals = matches
+        .filter((lm) => lm.match.stage === round.key)
+        .sort((a, b) => parseInt(a.match.externalMatchId ?? "0", 10) - parseInt(b.match.externalMatchId ?? "0", 10));
 
-      // Team-ID matching for slots with at least one known projected team.
-      // Tries both home/away orderings (DB may store them swapped vs template).
-      // For thirdPlace refs (unknown until bracket is set), matches by the known side only.
-      for (const template of stageTemplates) {
-        const ph = projTeam(template.home);
-        const pa = projTeam(template.away);
-        const isThirdHome = template.home.kind === "thirdPlace";
-        const isThirdAway = template.away.kind === "thirdPlace";
-        if (!ph && !pa) continue;
+      const stageTemplates = KNOCKOUT_TEMPLATES
+        .filter((t) => t.stage === round.key)
+        .sort((a, b) => a.no - b.no);
 
-        const match = stageActuals.find((a) => {
-          if (usedIds.has(a.id)) return false;
-          if (a.match.homeTeam.name === "TBD" || a.match.awayTeam.name === "TBD") return false;
-          const aH = a.match.homeTeam.id;
-          const aA = a.match.awayTeam.id;
-          if (ph && pa) {
-            // Both known: accept either ordering
-            return (aH === ph.id && aA === pa.id) || (aH === pa.id && aA === ph.id);
-          }
-          if (ph && isThirdAway) return aH === ph.id || aA === ph.id;
-          if (pa && isThirdHome) return aH === pa.id || aA === pa.id;
-          return false;
-        });
-
-        if (match) {
-          actualByNo.set(template.no, match);
-          usedIds.add(match.id);
-        }
-      }
-
-      // Sequential-by-kickoff fallback for remaining unmatched slots
-      const remainingTemplates = stageTemplates.filter((t) => !actualByNo.has(t.no)).sort((a, b) => a.no - b.no);
-      const remainingActuals = stageActuals.filter((a) => !usedIds.has(a.id));
-      remainingActuals.forEach((actual, i) => {
-        if (i < remainingTemplates.length) actualByNo.set(remainingTemplates[i].no, actual);
+      stageActuals.forEach((actual, i) => {
+        if (i < stageTemplates.length) actualByNo.set(stageTemplates[i].no, actual);
       });
-
-      // Store projections so next rounds can resolve winners
-      for (const template of stageTemplates) {
-        const actual = actualByNo.get(template.no);
-        projResolvedByNo.set(template.no, {
-          ...template,
-          actual,
-          home: { label: template.home.label, team: projTeam(template.home) ?? actual?.match.homeTeam },
-          away: { label: template.away.label, team: projTeam(template.away) ?? actual?.match.awayTeam },
-          homeScore: actual?.match.homeScore ?? null,
-          awayScore: actual?.match.awayScore ?? null,
-          extraTimeHome: actual?.match.extraTimeHome ?? null,
-          extraTimeAway: actual?.match.extraTimeAway ?? null,
-          penaltiesHome: actual?.match.penaltiesHome ?? null,
-          penaltiesAway: actual?.match.penaltiesAway ?? null,
-          duration: actual?.match.duration ?? null,
-          winner: actual?.match.winner ?? "UNKNOWN",
-          kickoffAt: actual?.match.kickoffAt,
-          status: actual?.status ?? "TBD",
-        });
-      }
     }
 
-    // Phase 2: build final resolved matches with full entrant labels and group-rank fallback
+    // Build resolved matches: team comes directly from the DB (provider fills them in).
+    // For later-round slots, resolve winner/loser from the matched earlier-round result.
     const resolvedByMatchNo = new Map<number, ResolvedKnockoutMatch>();
 
     const resolveEntrant = (ref: EntrantRef, actualTeam?: Team): ResolvedEntrant => {
-      if (ref.kind === "groupRank") {
-        return {
-          label: ref.label,
-          team: (groupIsComplete(ref.group) ? groupStandings[ref.group]?.[ref.rank - 1]?.team : undefined) ?? actualTeam,
-        };
-      }
-      if (ref.kind === "thirdPlace") {
+      if (ref.kind === "groupRank" || ref.kind === "thirdPlace") {
+        // Trust what provider has already assigned to the match record
         return { label: ref.label, team: actualTeam };
       }
       const source = resolvedByMatchNo.get(ref.matchNo);
@@ -706,7 +649,7 @@ export default function StandingsPage() {
       ...round,
       matches: KNOCKOUT_TEMPLATES.filter((template) => template.stage === round.key).map((template) => resolvedByMatchNo.get(template.no)!),
     }));
-  }, [matches, groupStandings, providerStandings]);
+  }, [matches]);
 
   const knockoutMatchCount = knockoutByRound.reduce((total, round) => total + round.matches.filter((match) => match.actual).length, 0);
   const knockoutMatchesByNo = useMemo(() => {

@@ -174,6 +174,11 @@ export async function fetchWorldCupMatches() {
       const periods = extractPeriodScores(m.score);
       const newStatus = mapStatus(m.status);
 
+      // Debug: log knockout match IDs to verify externalMatchId ordering vs bracket slot order
+      if (m.stage !== "GROUP_STAGE") {
+        console.log(`[bracket-debug] stage=${m.stage} id=${m.id} matchday=${m.matchday ?? "null"} kickoff=${m.utcDate} home=${homeTeam.name ?? "TBD"} away=${awayTeam.name ?? "TBD"}`);
+      }
+
       const existingMatch = await prisma.match.findUnique({
         where: { externalMatchId: String(m.id) }
       });

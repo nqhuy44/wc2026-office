@@ -60,13 +60,27 @@ export async function scoreMatch(matchId: string) {
 
     const home90 = match.homeScore;
     const away90 = match.awayScore;
-    let winner90 = "DRAW";
-    if (home90 > away90) winner90 = "HOME";
-    if (home90 < away90) winner90 = "AWAY";
+    let matchWinner = "DRAW";
+    if (home90 > away90) matchWinner = "HOME";
+    else if (home90 < away90) matchWinner = "AWAY";
+    else {
+      // 90-min draw: actual winner via ET cumulative score, then penalties
+      const etH = (match as any).extraTimeHome as number | null;
+      const etA = (match as any).extraTimeAway as number | null;
+      const penH = (match as any).penaltiesHome as number | null;
+      const penA = (match as any).penaltiesAway as number | null;
+      if (penH !== null && penA !== null) {
+        if (penH > penA) matchWinner = "HOME";
+        else if (penH < penA) matchWinner = "AWAY";
+      } else if (etH !== null && etA !== null) {
+        if (etH > etA) matchWinner = "HOME";
+        else if (etH < etA) matchWinner = "AWAY";
+      }
+    }
 
     await tx.match.update({
       where: { id: matchId },
-      data: { winner: winner90 as any, status: "SCORED", scoredAt: new Date() }
+      data: { winner: matchWinner as any, status: "SCORED", scoredAt: new Date() }
     });
 
     for (const lm of match.leagueMatches) {
