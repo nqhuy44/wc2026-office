@@ -21,6 +21,12 @@ interface Match {
   kickoffAt: string;
   homeScore: number | null;
   awayScore: number | null;
+  extraTimeHome: number | null;
+  extraTimeAway: number | null;
+  penaltiesHome: number | null;
+  penaltiesAway: number | null;
+  duration: string | null;
+  winner: string;
   homeTeam: Team;
   awayTeam: Team;
 }
@@ -99,6 +105,12 @@ interface ResolvedKnockoutMatch {
   away: ResolvedEntrant;
   homeScore: number | null;
   awayScore: number | null;
+  extraTimeHome: number | null;
+  extraTimeAway: number | null;
+  penaltiesHome: number | null;
+  penaltiesAway: number | null;
+  duration: string | null;
+  winner: string;
   kickoffAt?: string;
   status: string;
 }
@@ -145,8 +157,12 @@ function bktColLeft(ci: number): number {
 
 function BracketCard({ match, language }: { match: ResolvedKnockoutMatch; language: string }) {
   const scored = match.homeScore !== null && match.awayScore !== null;
-  const homeWon = scored && match.homeScore! > match.awayScore!;
-  const awayWon = scored && match.awayScore! > match.homeScore!;
+  const homeWon = match.winner === "HOME" || (match.winner === "UNKNOWN" && scored && match.homeScore! > match.awayScore!);
+  const awayWon = match.winner === "AWAY" || (match.winner === "UNKNOWN" && scored && match.awayScore! > match.homeScore!);
+
+  const hasET  = match.extraTimeHome !== null && match.extraTimeAway !== null;
+  const hasPen = match.penaltiesHome !== null && match.penaltiesAway !== null;
+
   const dateStr = match.kickoffAt
     ? (() => {
         const d = new Date(match.kickoffAt);
@@ -156,35 +172,62 @@ function BracketCard({ match, language }: { match: ResolvedKnockoutMatch; langua
       })()
     : "TBD";
 
-  const renderRow = (entrant: ResolvedEntrant, score: number | null, won: boolean) => (
-    <div style={{ height: 41, display: "flex", alignItems: "center", gap: 8, padding: "0 12px", background: won ? "#f0fdf4" : "transparent" }}>
+  // Score display: "2" or "2 (aet 3)" or "2 (pen 4)"
+  const scoreLabel = (main: number | null, et: number | null, pen: number | null): string => {
+    if (main === null) return "—";
+    if (pen !== null) return `${main}`;   // show 90-min score; pen shown separately
+    if (et  !== null) return `${et}`;     // show ET (cumulative) score
+    return `${main}`;
+  };
+
+  const renderRow = (entrant: ResolvedEntrant, main: number | null, et: number | null, pen: number | null, won: boolean) => (
+    <div style={{ height: 41, display: "flex", alignItems: "center", gap: 6, padding: "0 10px", background: won ? "#f0fdf4" : "transparent" }}>
       {entrant.team ? (
         entrant.team.flagUrl
-          ? <img src={entrant.team.flagUrl} style={{ width: 24, height: 24, objectFit: "contain", flexShrink: 0 }} alt="" />
-          : <span style={{ width: 24, height: 24, borderRadius: "50%", background: "#e5e7eb", fontSize: 10, fontWeight: 700, color: "#6b7280", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          ? <img src={entrant.team.flagUrl} style={{ width: 22, height: 22, objectFit: "contain", flexShrink: 0 }} alt="" />
+          : <span style={{ width: 22, height: 22, borderRadius: "50%", background: "#e5e7eb", fontSize: 9, fontWeight: 700, color: "#6b7280", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
               {(entrant.team.shortName ?? entrant.team.name).slice(0, 2).toUpperCase()}
             </span>
       ) : (
-        <span style={{ width: 24, height: 24, borderRadius: "50%", border: "1px dashed #d1d5db", background: "#f9fafb", fontSize: 10, fontWeight: 800, color: "#9ca3af", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>?</span>
+        <span style={{ width: 22, height: 22, borderRadius: "50%", border: "1px dashed #d1d5db", background: "#f9fafb", fontSize: 9, fontWeight: 800, color: "#9ca3af", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>?</span>
       )}
-      <span style={{ fontSize: 13, fontWeight: won ? 700 : 500, color: won ? "#111827" : "#374151", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
+      <span style={{ fontSize: 12, fontWeight: won ? 700 : 500, color: won ? "#111827" : "#374151", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
         {entrant.team?.name ?? entrant.label}
       </span>
-      <span style={{ fontSize: 14, fontWeight: 900, color: won ? "#15803d" : scored ? "#111827" : "#d1d5db", flexShrink: 0, marginLeft: 4 }}>
-        {score ?? "—"}
-      </span>
+      <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+        <span style={{ fontSize: 14, fontWeight: 900, color: won ? "#15803d" : scored ? "#111827" : "#d1d5db", minWidth: 14, textAlign: "right" }}>
+          {scoreLabel(main, et, pen)}
+        </span>
+        {pen !== null && (
+          <span style={{ fontSize: 9, fontWeight: 800, color: won ? "#15803d" : "#6b7280", background: won ? "#dcfce7" : "#f3f4f6", border: `1px solid ${won ? "#86efac" : "#e5e7eb"}`, borderRadius: 3, padding: "0 3px", lineHeight: "14px" }}>
+            ({pen})
+          </span>
+        )}
+      </div>
     </div>
   );
 
+  // Duration badge
+  const durationBadge = hasET
+    ? (hasPen ? "PEN" : "AET")
+    : null;
+
   return (
     <div style={{ width: BKT_CARD_W, border: "1px solid #e5e7eb", borderRadius: 8, background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.08)", overflow: "hidden" }}>
-      <div style={{ height: 26, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 12px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
-        <span style={{ fontSize: 10, fontWeight: 800, color: "#6b7280", textTransform: "uppercase" }}>{match.shortLabel}</span>
+      <div style={{ height: 26, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 10px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+          <span style={{ fontSize: 10, fontWeight: 800, color: "#6b7280", textTransform: "uppercase" }}>{match.shortLabel}</span>
+          {durationBadge && (
+            <span style={{ fontSize: 8, fontWeight: 800, color: "#92400e", background: "#fef3c7", border: "1px solid #fde68a", borderRadius: 3, padding: "0 3px", lineHeight: "14px" }}>
+              {durationBadge}
+            </span>
+          )}
+        </div>
         <span style={{ fontSize: 10, color: "#9ca3af" }}>{dateStr}</span>
       </div>
-      {renderRow(match.home, match.homeScore, homeWon)}
+      {renderRow(match.home, match.homeScore, match.extraTimeHome, match.penaltiesHome, homeWon)}
       <div style={{ height: 1, background: "#f3f4f6" }} />
-      {renderRow(match.away, match.awayScore, awayWon)}
+      {renderRow(match.away, match.awayScore, match.extraTimeAway, match.penaltiesAway, awayWon)}
     </div>
   );
 }
@@ -442,11 +485,16 @@ function scoredMatch(match?: LeagueMatch) {
 }
 
 function getWinner(match: ResolvedKnockoutMatch): ResolvedEntrant | undefined {
+  if (match.winner === "HOME") return match.home;
+  if (match.winner === "AWAY") return match.away;
+  // Fallback for non-knockout (90-min) or before winner field is set
   if (match.homeScore === null || match.awayScore === null || match.homeScore === match.awayScore) return undefined;
   return match.homeScore > match.awayScore ? match.home : match.away;
 }
 
 function getLoser(match: ResolvedKnockoutMatch): ResolvedEntrant | undefined {
+  if (match.winner === "HOME") return match.away;
+  if (match.winner === "AWAY") return match.home;
   if (match.homeScore === null || match.awayScore === null || match.homeScore === match.awayScore) return undefined;
   return match.homeScore > match.awayScore ? match.away : match.home;
 }
@@ -553,18 +601,30 @@ export default function StandingsPage() {
       const stageTemplates = KNOCKOUT_TEMPLATES.filter((t) => t.stage === round.key);
       const usedIds = new Set<string>();
 
-      // Team-ID matching for slots with known projected teams
+      // Team-ID matching for slots with at least one known projected team.
+      // Tries both home/away orderings (DB may store them swapped vs template).
+      // For thirdPlace refs (unknown until bracket is set), matches by the known side only.
       for (const template of stageTemplates) {
         const ph = projTeam(template.home);
         const pa = projTeam(template.away);
-        if (!ph || !pa) continue;
-        const match = stageActuals.find(
-          (a) =>
-            !usedIds.has(a.id) &&
-            a.match.homeTeam.name !== "TBD" &&
-            a.match.homeTeam.id === ph.id &&
-            a.match.awayTeam.id === pa.id
-        );
+        const isThirdHome = template.home.kind === "thirdPlace";
+        const isThirdAway = template.away.kind === "thirdPlace";
+        if (!ph && !pa) continue;
+
+        const match = stageActuals.find((a) => {
+          if (usedIds.has(a.id)) return false;
+          if (a.match.homeTeam.name === "TBD" || a.match.awayTeam.name === "TBD") return false;
+          const aH = a.match.homeTeam.id;
+          const aA = a.match.awayTeam.id;
+          if (ph && pa) {
+            // Both known: accept either ordering
+            return (aH === ph.id && aA === pa.id) || (aH === pa.id && aA === ph.id);
+          }
+          if (ph && isThirdAway) return aH === ph.id || aA === ph.id;
+          if (pa && isThirdHome) return aH === pa.id || aA === pa.id;
+          return false;
+        });
+
         if (match) {
           actualByNo.set(template.no, match);
           usedIds.add(match.id);
@@ -588,6 +648,12 @@ export default function StandingsPage() {
           away: { label: template.away.label, team: projTeam(template.away) ?? actual?.match.awayTeam },
           homeScore: actual?.match.homeScore ?? null,
           awayScore: actual?.match.awayScore ?? null,
+          extraTimeHome: actual?.match.extraTimeHome ?? null,
+          extraTimeAway: actual?.match.extraTimeAway ?? null,
+          penaltiesHome: actual?.match.penaltiesHome ?? null,
+          penaltiesAway: actual?.match.penaltiesAway ?? null,
+          duration: actual?.match.duration ?? null,
+          winner: actual?.match.winner ?? "UNKNOWN",
           kickoffAt: actual?.match.kickoffAt,
           status: actual?.status ?? "TBD",
         });
@@ -624,6 +690,12 @@ export default function StandingsPage() {
         away: resolveEntrant(template.away, actual?.match.awayTeam),
         homeScore: actual?.match.homeScore ?? null,
         awayScore: actual?.match.awayScore ?? null,
+        extraTimeHome: actual?.match.extraTimeHome ?? null,
+        extraTimeAway: actual?.match.extraTimeAway ?? null,
+        penaltiesHome: actual?.match.penaltiesHome ?? null,
+        penaltiesAway: actual?.match.penaltiesAway ?? null,
+        duration: actual?.match.duration ?? null,
+        winner: actual?.match.winner ?? "UNKNOWN",
         kickoffAt: actual?.match.kickoffAt,
         status: actual?.status ?? "TBD",
       };

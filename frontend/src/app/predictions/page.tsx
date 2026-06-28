@@ -7,11 +7,12 @@ import { useLanguage } from "@/context/language-context";
 import { AlertCircle } from "lucide-react";
 import Link from "next/link";
 import TeamLogo from "@/components/team-logo";
+import { parseScore } from "@/lib/match-score";
 
 interface Team { id: string; name: string; shortName: string; flagUrl: string; }
-interface Match { id: string; stage: string; groupName: string | null; kickoffAt: string; homeScore: number | null; awayScore: number | null; homeTeam: Team; awayTeam: Team; }
+interface Match { id: string; stage: string; groupName: string | null; kickoffAt: string; homeScore: number | null; awayScore: number | null; extraTimeHome: number | null; extraTimeAway: number | null; penaltiesHome: number | null; penaltiesAway: number | null; duration: string | null; homeTeam: Team; awayTeam: Team; }
 interface LeagueMatch {
-  id: string; status: string; isPredictionEnabled: boolean; lockAt: string; match: Match;
+  id: string; status: string; isPredictionEnabled: boolean; isBonus: boolean; lockAt: string; match: Match;
   myPrediction: { homeScorePred: number; awayScorePred: number; isHopeStar: boolean; points: number; resultType: string; } | null;
 }
 
@@ -131,10 +132,11 @@ export default function PredictionsPage() {
                 <div className="kp-card flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 hover:shadow-md transition-shadow" style={{ padding: '14px 18px' }}>
                   {/* Teams */}
                   <div className="w-full sm:flex-1 min-w-0">
-                    <div className="text-[14px] font-semibold text-foreground truncate flex items-center gap-2">
+                    <div className="text-[14px] font-semibold text-foreground flex items-center gap-2 flex-wrap">
                       <TeamLogo name={lm.match.homeTeam.name} flagUrl={lm.match.homeTeam.flagUrl} className="w-7 h-7" imageClassName="w-5 h-5" fallbackClassName="text-[18px]" />
                       <span className="truncate">{lm.match.homeTeam.name} vs {lm.match.awayTeam.name}</span>
                       <TeamLogo name={lm.match.awayTeam.name} flagUrl={lm.match.awayTeam.flagUrl} className="w-7 h-7" imageClassName="w-5 h-5" fallbackClassName="text-[18px]" />
+                      {lm.isBonus && <span className="text-[10px] font-extrabold bg-amber-100 text-amber-700 border border-amber-300 px-1.5 py-0.5 rounded shrink-0">BONUS</span>}
                     </div>
                     <div className="text-[12px] text-muted-foreground mt-0.5">
                       {stageLabel(lm.match.stage, lm.match.groupName)} · {new Date(lm.match.kickoffAt).toLocaleDateString(language === "vi" ? 'vi-VN' : 'en-US', { month: 'short', day: 'numeric' })}
@@ -145,9 +147,9 @@ export default function PredictionsPage() {
                     <div className="text-[11px] text-muted-foreground font-semibold uppercase sm:mb-0">
                       {t("yourPick")}
                     </div>
-                    <div className="text-[16px] font-black flex items-center gap-1">
+                    <div className="text-[16px] font-black flex items-center gap-1.5">
                       {p.homeScorePred} – {p.awayScorePred}
-                      {p.isHopeStar && <span className="text-amber-500 text-[15px]">⭐</span>}
+                      {p.isHopeStar && <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded border border-yellow-300 bg-yellow-100 text-yellow-800">{t("hopeStarLabel")}</span>}
                     </div>
                   </div>
                   {/* Result */}
@@ -157,7 +159,20 @@ export default function PredictionsPage() {
                         <div className="text-[11px] text-muted-foreground font-semibold uppercase">
                           {t("finalResult")}
                         </div>
-                        <div className="text-[16px] font-black">{lm.match.homeScore} – {lm.match.awayScore}</div>
+                        {(() => {
+                          const sc = parseScore(lm.match);
+                          return (
+                            <div className="flex flex-col items-end sm:items-center">
+                              <div className="text-[16px] font-black">{sc.homeMain} – {sc.awayMain}</div>
+                              {sc.suffix === "pen" && (
+                                <span className="text-[10px] font-extrabold text-amber-700">({sc.homePen}-{sc.awayPen}) PEN</span>
+                              )}
+                              {sc.suffix && (
+                                <span className="text-[9px] text-muted-foreground uppercase">AET</span>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </div>
                       <div className="flex flex-row sm:flex-col items-center sm:items-end justify-between gap-2 sm:gap-0.5 sm:min-w-[80px]">
                         <span className={`text-[13px] font-bold px-2.5 py-0.5 rounded-md ${isExact ? 'kp-pts-exact' : isCorrect ? 'kp-pts-correct' : 'kp-pts-wrong'}`}>

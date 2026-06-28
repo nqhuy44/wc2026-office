@@ -24,6 +24,7 @@ import {
   Search,
   Eye
 } from "lucide-react";
+import { parseScore, scoreText } from "@/lib/match-score";
 
 interface Participant {
   id: string;
@@ -49,6 +50,11 @@ interface Match {
   kickoffAt: string;
   homeScore: number | null;
   awayScore: number | null;
+  extraTimeHome: number | null;
+  extraTimeAway: number | null;
+  penaltiesHome: number | null;
+  penaltiesAway: number | null;
+  duration: string | null;
   homeTeam: Team;
   awayTeam: Team;
   status: string;
@@ -290,12 +296,16 @@ function AdminPageContent() {
       // Initialize manual score inputs
       const initialScores: typeof scoreState = {};
       matchesData.matches.forEach((lm) => {
-        initialScores[lm.match.id] = {
-          home: lm.match.homeScore ?? "",
-          away: lm.match.awayScore ?? "",
-          duration: "REGULAR",
-          etHome: "", etAway: "",
-          penHome: "", penAway: "",
+        const m = lm.match;
+        const dur = (m.duration ?? "REGULAR") as "REGULAR" | "EXTRA_TIME" | "PENALTY_SHOOTOUT";
+        initialScores[m.id] = {
+          home: m.homeScore ?? "",
+          away: m.awayScore ?? "",
+          duration: dur,
+          etHome: m.extraTimeHome ?? "",
+          etAway: m.extraTimeAway ?? "",
+          penHome: m.penaltiesHome ?? "",
+          penAway: m.penaltiesAway ?? "",
         };
       });
       setScoreState(initialScores);
@@ -1022,7 +1032,7 @@ function AdminPageContent() {
                                   </div>
                                   {lm.match.homeScore !== null && (
                                     <span className="text-[11px] font-extrabold text-muted-foreground bg-gray-100 px-2 py-1 rounded justify-self-end whitespace-nowrap">
-                                      {lm.match.homeScore} - {lm.match.awayScore}
+                                      {scoreText(lm.match, "-")}
                                     </span>
                                   )}
                                 </div>
@@ -1298,8 +1308,13 @@ function AdminPageContent() {
                           <span className="text-[11px] font-extrabold bg-amber-100 text-amber-700 border border-amber-300 px-2 py-0.5 rounded">BONUS</span>
                         )}
                       </h3>
-                      <p className="text-muted-foreground text-[13px] mt-0.5">
+                      <p className="text-muted-foreground text-[13px] mt-0.5 flex items-center gap-2">
                         {selectedPredictionMatch.match.homeTeam.name} vs {selectedPredictionMatch.match.awayTeam.name}
+                        {selectedPredictionMatch.match.homeScore !== null && (
+                          <span className="font-extrabold text-foreground bg-gray-100 px-2 py-0.5 rounded text-[12px]">
+                            {scoreText(selectedPredictionMatch.match, "-")}
+                          </span>
+                        )}
                       </p>
                     </div>
                     <button
@@ -1487,6 +1502,9 @@ function AdminPageContent() {
                       <tr key={lm.id} className="hover:bg-[#fcfbf7] transition-all">
                         <td className="px-6 py-4 text-muted-foreground font-semibold text-[11px] uppercase tracking-wider align-top pt-5">
                           {stageLabel(lm.match.stage, lm.match.groupName)}
+                          {lm.isBonus && (
+                            <span className="mt-1 block text-[10px] font-extrabold bg-amber-100 text-amber-700 border border-amber-300 px-1.5 py-0.5 rounded w-fit normal-case tracking-normal">BONUS</span>
+                          )}
                         </td>
                         <td className="px-6 py-4">
                           {/* 90-min score row */}

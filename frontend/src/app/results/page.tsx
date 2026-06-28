@@ -5,6 +5,7 @@ import NavigationShell from "@/components/navigation-shell";
 import { apiClient } from "@/lib/api-client";
 import { useLanguage } from "@/context/language-context";
 import { AlertCircle, RefreshCw } from "lucide-react";
+import { scoreText } from "@/lib/match-score";
 
 interface Team {
   id: string;
@@ -20,6 +21,11 @@ interface Match {
   kickoffAt: string;
   homeScore: number | null;
   awayScore: number | null;
+  extraTimeHome: number | null;
+  extraTimeAway: number | null;
+  penaltiesHome: number | null;
+  penaltiesAway: number | null;
+  duration: string | null;
   homeTeam: Team;
   awayTeam: Team;
 }
@@ -121,8 +127,8 @@ export default function ResultsPage() {
                         </div>
                       </td>
                       <td className="px-6 py-4 text-center font-black text-foreground text-[15px]">
-                        <span className="px-2.5 py-1 bg-muted border border-border rounded">
-                          {lm.match.homeScore} - {lm.match.awayScore}
+                        <span className="px-2.5 py-1 bg-muted border border-border rounded whitespace-nowrap">
+                          {scoreText(lm.match, "-")}
                         </span>
                       </td>
                       <td className="px-6 py-4 text-center">

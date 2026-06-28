@@ -7,9 +7,17 @@ import { apiClient } from "@/lib/api-client";
 import { useLanguage } from "@/context/language-context";
 import Link from "next/link";
 import TeamLogo from "@/components/team-logo";
+import { parseScore } from "@/lib/match-score";
 
 interface Team { id: string; name: string; shortName: string; flagUrl: string; }
-interface Match { id: string; stage: string; groupName: string | null; kickoffAt: string; homeScore: number | null; awayScore: number | null; homeTeam: Team; awayTeam: Team; }
+interface Match {
+  id: string; stage: string; groupName: string | null; kickoffAt: string;
+  homeScore: number | null; awayScore: number | null;
+  extraTimeHome: number | null; extraTimeAway: number | null;
+  penaltiesHome: number | null; penaltiesAway: number | null;
+  duration: string | null;
+  homeTeam: Team; awayTeam: Team;
+}
 interface LeagueMatch {
   id: string; status: string; isPredictionEnabled: boolean; lockAt: string; match: Match;
   myPrediction: { id: string; homeScorePred: number; awayScorePred: number; isHopeStar: boolean; points: number; resultType: string; } | null;
@@ -28,8 +36,8 @@ export default function MatchDetailPage() {
   // Prediction form
   const [homeScore, setHomeScore] = useState(0);
   const [awayScore, setAwayScore] = useState(0);
+  const [wantHopeStar, setWantHopeStar] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [togglingHopeStar, setTogglingHopeStar] = useState(false);
   const [toast, setToast] = useState(false);
 
   useEffect(() => {
@@ -42,6 +50,7 @@ export default function MatchDetailPage() {
           if (found.myPrediction) {
             setHomeScore(found.myPrediction.homeScorePred);
             setAwayScore(found.myPrediction.awayScorePred);
+            setWantHopeStar(found.myPrediction.isHopeStar);
           }
         }
         setHopeStarTotal(data.hopeStarTotal ?? 0);
@@ -59,15 +68,37 @@ export default function MatchDetailPage() {
     if (!lm) return;
     setSaving(true);
     try {
+      // Step 1: save prediction score
       await apiClient(`/predictions/${lm.id}`, {
         method: "PUT",
         json: { homeScorePred: homeScore, awayScorePred: awayScore },
       });
+
+      const currentHopeStar = lm.myPrediction?.isHopeStar ?? false;
+
+      // Step 2: sync hope star if changed
+      let newHopeStar = currentHopeStar;
+      if (hopeStarTotal > 0 && wantHopeStar !== currentHopeStar) {
+        try {
+          const hsData = await apiClient<{ prediction: { isHopeStar: boolean }; hopeStarUsed: number; hopeStarTotal: number }>(
+            `/predictions/${lm.id}/hope-star`,
+            { method: "PUT" }
+          );
+          newHopeStar = hsData.prediction.isHopeStar;
+          setHopeStarUsed(hsData.hopeStarUsed);
+          setHopeStarTotal(hsData.hopeStarTotal);
+        } catch {
+          // quota exceeded or other error — keep wantHopeStar in sync with what was actually saved
+          setWantHopeStar(currentHopeStar);
+          newHopeStar = currentHopeStar;
+        }
+      }
+
       setLm((prev) => prev ? {
         ...prev,
         myPrediction: prev.myPrediction
-          ? { ...prev.myPrediction, homeScorePred: homeScore, awayScorePred: awayScore, points: 0, resultType: "PENDING" }
-          : { id: "", homeScorePred: homeScore, awayScorePred: awayScore, isHopeStar: false, points: 0, resultType: "PENDING" },
+          ? { ...prev.myPrediction, homeScorePred: homeScore, awayScorePred: awayScore, isHopeStar: newHopeStar, points: 0, resultType: "PENDING" }
+          : { id: "", homeScorePred: homeScore, awayScorePred: awayScore, isHopeStar: newHopeStar, points: 0, resultType: "PENDING" },
       } : null);
       setToast(true);
       setTimeout(() => setToast(false), 4000);
@@ -75,27 +106,6 @@ export default function MatchDetailPage() {
       alert(err.code ? t(err.code as any) : t("errUnknown"));
     } finally {
       setSaving(false);
-    }
-  };
-
-  const handleToggleHopeStar = async () => {
-    if (!lm) return;
-    setTogglingHopeStar(true);
-    try {
-      const data = await apiClient<{ prediction: { isHopeStar: boolean }; hopeStarUsed: number; hopeStarTotal: number }>(
-        `/predictions/${lm.id}/hope-star`,
-        { method: "PUT" }
-      );
-      setLm((prev) => prev && prev.myPrediction
-        ? { ...prev, myPrediction: { ...prev.myPrediction, isHopeStar: data.prediction.isHopeStar } }
-        : prev
-      );
-      setHopeStarUsed(data.hopeStarUsed);
-      setHopeStarTotal(data.hopeStarTotal);
-    } catch (err: any) {
-      alert(err.code ? t(err.code as any) : t("errUnknown"));
-    } finally {
-      setTogglingHopeStar(false);
     }
   };
 
@@ -131,9 +141,9 @@ export default function MatchDetailPage() {
   const isScored = lm.status === "SCORED" || lm.status === "FINISHED";
   const hasFinalScore = lm.match.homeScore !== null && lm.match.awayScore !== null;
   const hasValidPrediction = Boolean(lm.myPrediction && lm.myPrediction.resultType !== "VOID");
-  const hopeStar = lm.myPrediction?.isHopeStar ?? false;
-  const canAddHopeStar = hopeStarTotal > 0 && (hopeStar || hopeStarUsed < hopeStarTotal);
   const hopeStarRemaining = hopeStarTotal - hopeStarUsed;
+  // Can place a star: feature enabled AND (already using star here OR has remaining quota)
+  const canToggleStar = hopeStarTotal > 0 && (wantHopeStar || hopeStarRemaining > 0);
 
   const stageLabel = (() => {
     const { stage, groupName } = lm.match;
@@ -186,12 +196,24 @@ export default function MatchDetailPage() {
                   <span className="text-[18px] font-bold">{lm.match.homeTeam.name}</span>
                 </div>
                 <div className="text-center">
-                  <div className="text-[52px] font-black" style={{ letterSpacing: '6px' }}>
-                     {lm.match.homeScore} — {lm.match.awayScore}
-                  </div>
-                  <div className="text-[13px] opacity-70 font-semibold uppercase tracking-widest">
-                    {t("fullTimeLabel")}
-                  </div>
+                  {(() => {
+                    const sc = parseScore(lm.match);
+                    return (
+                      <>
+                        <div className="text-[52px] font-black" style={{ letterSpacing: '6px' }}>
+                          {sc.homeMain} — {sc.awayMain}
+                        </div>
+                        {sc.suffix === "pen" && (
+                          <div className="text-[16px] font-extrabold opacity-90 mt-1">
+                            ({sc.homePen}) — ({sc.awayPen}) PEN
+                          </div>
+                        )}
+                        <div className="text-[13px] opacity-70 font-semibold uppercase tracking-widest mt-1">
+                          {sc.suffix === "pen" ? "AET · PENALTIES" : sc.suffix === "aet" ? "AFTER EXTRA TIME" : t("fullTimeLabel")}
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
                 <div className="flex flex-col items-center gap-2">
                   <TeamLogo name={lm.match.awayTeam.name} flagUrl={lm.match.awayTeam.flagUrl} className="w-14 h-14" imageClassName="w-11 h-11" fallbackClassName="text-[34px]" />
@@ -278,8 +300,23 @@ export default function MatchDetailPage() {
             {/* Prediction Form */}
             {isOpen && (
               <div className="kp-card mb-5" style={{ borderRadius: '12px', padding: '24px 28px' }}>
-                <div className="text-[16px] font-bold text-foreground mb-1">
-                  {t("yourPredictionTitle")}
+                <div className="flex items-center justify-between mb-1">
+                  <div className="text-[16px] font-bold text-foreground">
+                    {t("yourPredictionTitle")}
+                  </div>
+                  {/* Hope star remaining count — shown prominently if feature enabled */}
+                  {hopeStarTotal > 0 && (
+                    <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[12px] font-extrabold ${
+                      hopeStarRemaining > 0
+                        ? "border-yellow-300 bg-yellow-50 text-yellow-800"
+                        : "border-gray-200 bg-gray-50 text-muted-foreground"
+                    }`}>
+                      ⭐ {hopeStarRemaining > 0
+                        ? t("hopeStarRemaining").replace("{n}", String(hopeStarRemaining))
+                        : t("hopeStarUsedAll")
+                      }
+                    </div>
+                  )}
                 </div>
                 <div className="text-[13px] text-muted-foreground mb-5">
                   {t("enterPredictionInstructions")}
@@ -318,32 +355,37 @@ export default function MatchDetailPage() {
                   🖊 {t("editPredictionNotice")}
                 </div>
 
-                {/* Hope Star section — only shown if feature enabled */}
-                {hopeStarTotal > 0 && lm.myPrediction && (
-                  <div className={`flex items-center justify-between px-4 py-3 rounded-xl mb-4 border-2 transition-all ${hopeStar ? 'border-amber-400 bg-amber-50' : 'border-gray-200 bg-gray-50'}`}>
+                {/* Hope Star — always shown if feature enabled */}
+                {hopeStarTotal > 0 && (
+                  <div className={`flex items-center justify-between px-4 py-3 rounded-xl mb-4 border-2 transition-all ${
+                    wantHopeStar ? 'border-amber-400 bg-amber-50' : 'border-gray-200 bg-gray-50'
+                  }`}>
                     <div>
                       <div className="text-[13px] font-extrabold text-foreground flex items-center gap-1.5">
-                        ⭐ {t("hopeStarLabel")}
-                        {hopeStar && <span className="text-[11px] font-bold text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full">{t("hopeStarActive")}</span>}
+                        {t("hopeStarLabel")}
+                        {wantHopeStar && <span className="text-[11px] font-bold text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full">{t("hopeStarActive")}</span>}
                       </div>
                       <div className="text-[11px] text-muted-foreground mt-0.5">{t("hopeStarRules")}</div>
                     </div>
                     <div className="flex flex-col items-end gap-1">
                       <button
-                        onClick={handleToggleHopeStar}
-                        disabled={togglingHopeStar || (!hopeStar && hopeStarUsed >= hopeStarTotal)}
+                        onClick={() => {
+                          if (!wantHopeStar && hopeStarRemaining <= 0) return;
+                          setWantHopeStar(!wantHopeStar);
+                        }}
+                        disabled={!wantHopeStar && hopeStarRemaining <= 0}
                         className={`px-4 py-1.5 rounded-lg text-[12px] font-extrabold border transition-all disabled:opacity-40 ${
-                          hopeStar
+                          wantHopeStar
                             ? 'border-amber-400 bg-amber-100 text-amber-800 hover:bg-amber-200'
                             : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-100'
                         }`}
                       >
-                        {hopeStar ? t("hopeStarToggleOff") : t("hopeStarToggleOn")}
+                        {wantHopeStar ? t("hopeStarToggleOff") : t("hopeStarToggleOn")}
                       </button>
                       <span className="text-[11px] text-muted-foreground font-semibold">
-                        {hopeStarUsed >= hopeStarTotal && !hopeStar
+                        {hopeStarRemaining <= 0 && !wantHopeStar
                           ? t("hopeStarUsedAll")
-                          : t("hopeStarRemaining").replace("{n}", String(hopeStarRemaining))
+                          : t("hopeStarRemaining").replace("{n}", String(wantHopeStar ? hopeStarRemaining : hopeStarRemaining))
                         }
                       </span>
                     </div>

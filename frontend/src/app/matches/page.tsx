@@ -8,9 +8,10 @@ import { useLanguage } from "@/context/language-context";
 import { RefreshCw, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import TeamLogo from "@/components/team-logo";
+import { parseScore } from "@/lib/match-score";
 
 interface Team { id: string; name: string; shortName: string; flagUrl: string; }
-interface Match { id: string; stage: string; groupName: string | null; kickoffAt: string; homeScore: number | null; awayScore: number | null; homeTeam: Team; awayTeam: Team; }
+interface Match { id: string; stage: string; groupName: string | null; kickoffAt: string; homeScore: number | null; awayScore: number | null; extraTimeHome: number | null; extraTimeAway: number | null; penaltiesHome: number | null; penaltiesAway: number | null; duration: string | null; homeTeam: Team; awayTeam: Team; }
 interface LeagueMatch {
   id: string; status: string; isPredictionEnabled: boolean; isBonus: boolean; lockAt: string; match: Match;
   myPrediction: { homeScorePred: number; awayScorePred: number; isHopeStar: boolean; points: number; resultType: string; } | null;
@@ -188,13 +189,29 @@ function MatchesContent() {
                       </div>
                       <div className="flex flex-col items-center px-3">
                         {lm.match.homeScore !== null && lm.match.awayScore !== null ? (
-                          <>
-                            <div className="font-black tracking-wider" style={{ fontSize: isLive ? 28 : 26, letterSpacing: isLive ? '4px' : '3px' }}>
-                              {lm.match.homeScore} — {lm.match.awayScore}
-                            </div>
-                            {isLive && <div className="text-[12px] text-destructive font-bold mt-0.5">{t("inProgressStatus")}</div>}
-                            {isScored && <div className="text-[11px] text-muted-foreground mt-0.5">FT</div>}
-                          </>
+                          (() => {
+                            const sc = parseScore(lm.match);
+                            return (
+                              <>
+                                <div className="font-black tracking-wider" style={{ fontSize: isLive ? 28 : 26, letterSpacing: isLive ? '4px' : '3px' }}>
+                                  {sc.homeMain} — {sc.awayMain}
+                                </div>
+                                {isLive && <div className="text-[12px] text-destructive font-bold mt-0.5">{t("inProgressStatus")}</div>}
+                                {isScored && (
+                                  <div className="flex flex-col items-center gap-0.5 mt-0.5">
+                                    {sc.suffix === "pen" && (
+                                      <span className="text-[10px] font-extrabold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">
+                                        ({sc.homePen}) — ({sc.awayPen}) PEN
+                                      </span>
+                                    )}
+                                    <span className="text-[11px] text-muted-foreground">
+                                      {sc.suffix === "pen" ? "AET" : sc.suffix === "aet" ? "AET" : "FT"}
+                                    </span>
+                                  </div>
+                                )}
+                              </>
+                            );
+                          })()
                         ) : isLive ? (
                           <div className="px-3 py-1.5 rounded-lg border border-red-100 bg-red-50 text-[11px] font-extrabold uppercase tracking-wide text-destructive text-center">
                             {t("liveScorePending")}

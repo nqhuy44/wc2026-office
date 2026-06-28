@@ -8,6 +8,7 @@ import { Calendar, Clock, ArrowRight, Award, Target, Trophy, Star, Copy, Check, 
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import TeamLogo from "@/components/team-logo";
+import { parseScore, scoreText } from "@/lib/match-score";
 
 interface Team {
   id: string;
@@ -25,17 +26,24 @@ interface Match {
   awayTeam: Team;
   homeScore: number | null;
   awayScore: number | null;
+  extraTimeHome: number | null;
+  extraTimeAway: number | null;
+  penaltiesHome: number | null;
+  penaltiesAway: number | null;
+  duration: string | null;
 }
 
 interface LeagueMatch {
   id: string;
   status: string;
   isPredictionEnabled: boolean;
+  isBonus: boolean;
   lockAt: string;
   match: Match;
   myPrediction: {
     homeScorePred: number;
     awayScorePred: number;
+    isHopeStar: boolean;
     points: number;
     resultType: string;
   } | null;
@@ -418,6 +426,9 @@ export default function DashboardPage() {
                   <span className="text-[13px] text-muted-foreground">
                     {stageLabel(lm.match.stage, lm.match.groupName)}
                   </span>
+                  {lm.isBonus && (
+                    <span className="text-[10px] font-extrabold bg-amber-100 text-amber-700 border border-amber-300 px-1.5 py-0.5 rounded">BONUS</span>
+                  )}
                 </div>
                 <Link href="/matches" className="text-[12px] text-primary font-semibold hover:underline">
                   {t("allMatchesLink")}
@@ -430,9 +441,21 @@ export default function DashboardPage() {
                 </div>
                 <div className="text-center">
                   {lm.match.homeScore !== null && lm.match.awayScore !== null ? (
-                    <div className="text-[36px] font-black tracking-wider px-4" style={{ letterSpacing: '3px' }}>
-                      {lm.match.homeScore} — {lm.match.awayScore}
-                    </div>
+                    (() => {
+                      const sc = parseScore(lm.match);
+                      return (
+                        <>
+                          <div className="text-[36px] font-black tracking-wider px-4" style={{ letterSpacing: '3px' }}>
+                            {sc.homeMain} — {sc.awayMain}
+                          </div>
+                          {sc.suffix === "pen" && (
+                            <div className="text-[11px] font-extrabold text-amber-700">
+                              ({sc.homePen}) — ({sc.awayPen}) PEN
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()
                   ) : (
                     <div className="px-4 py-1.5 rounded-lg border border-red-100 bg-red-50 text-[12px] font-extrabold uppercase tracking-wide text-destructive">
                       {t("liveScorePending")}
@@ -451,9 +474,12 @@ export default function DashboardPage() {
                 <span className="text-[13px] text-muted-foreground">
                   {t("yourPrediction")}
                 </span>
-                <span className="text-[13px] font-bold text-foreground">
-                  {lm.myPrediction 
-                    ? `${lm.myPrediction.homeScorePred} — ${lm.myPrediction.awayScorePred} 🤞` 
+                <span className="text-[13px] font-bold text-foreground flex items-center gap-1.5">
+                  {lm.myPrediction
+                    ? <>
+                        {lm.myPrediction.homeScorePred} — {lm.myPrediction.awayScorePred}
+                        {lm.myPrediction.isHopeStar && <span className="text-[11px] font-extrabold px-1.5 py-0.5 rounded border border-yellow-300 bg-yellow-100 text-yellow-800">{t("hopeStarLabel")}</span>}
+                      </>
                     : t("noPrediction")
                   }
                 </span>
@@ -483,7 +509,7 @@ export default function DashboardPage() {
                   <span className="text-[14px] font-bold">{nextMatch.match.awayTeam.name}</span>
                 </div>
               </div>
-              <div className="flex items-center gap-4 mb-4 text-[13px] text-muted-foreground">
+              <div className="flex items-center flex-wrap gap-2 mb-4 text-[13px] text-muted-foreground">
                 <span>
                   📅 {new Date(nextMatch.match.kickoffAt).toLocaleDateString(language === "vi" ? 'vi-VN' : 'en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                 </span>
@@ -493,6 +519,9 @@ export default function DashboardPage() {
                 <span>
                   {stageLabel(nextMatch.match.stage, nextMatch.match.groupName)}
                 </span>
+                {nextMatch.isBonus && (
+                  <span className="text-[10px] font-extrabold bg-amber-100 text-amber-700 border border-amber-300 px-1.5 py-0.5 rounded">BONUS</span>
+                )}
               </div>
               <div className="flex items-center justify-between">
                 <div className="text-[13px] font-bold text-amber-600 flex items-center gap-1.5">
@@ -530,13 +559,17 @@ export default function DashboardPage() {
                 const type = lm.myPrediction?.resultType;
                 const isExact = type === "EXACT_SCORE";
                 const isCorrect = type === "CORRECT_RESULT";
-                const scoreStr = `${lm.match.homeScore}–${lm.match.awayScore}`;
+                const scoreStr = scoreText(lm.match, "–");
                 const pickStr = `${lm.myPrediction?.homeScorePred}–${lm.myPrediction?.awayScorePred}`;
 
                 return (
                   <div key={lm.id} className="flex items-center justify-between p-3 rounded-lg" style={{ background: '#F9FAFB', border: '1px solid #F3F4F6' }}>
                     <div>
-                      <div className="text-[14px] font-semibold">{lm.match.homeTeam.name} vs {lm.match.awayTeam.name}</div>
+                      <div className="text-[14px] font-semibold flex items-center gap-1.5">
+                        {lm.match.homeTeam.name} vs {lm.match.awayTeam.name}
+                        {lm.isBonus && <span className="text-[10px] font-extrabold bg-amber-100 text-amber-700 border border-amber-300 px-1.5 py-0.5 rounded">BONUS</span>}
+                        {lm.myPrediction?.isHopeStar && <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded border border-yellow-300 bg-yellow-100 text-yellow-800">{t("hopeStarLabel")}</span>}
+                      </div>
                       <div className="text-[13px] text-muted-foreground mt-px">
                         {t("recentResultsScoreAndPick").replace("{score}", scoreStr).replace("{pick}", pickStr)}
                       </div>
