@@ -1299,8 +1299,16 @@ function AdminPageContent() {
 
             {selectedPredictionMatch && (
               <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/20 backdrop-blur-[2px]">
-                <div className="w-full max-w-[860px] bg-white border border-border rounded-lg p-6 shadow-[0_24px_50px_rgba(31,41,55,0.16)] flex flex-col max-h-[90vh]">
-                  <div className="flex items-start justify-between border-b border-border pb-3 mb-4 gap-4">
+                <div
+                  className="w-full max-w-[860px] rounded-lg p-6 shadow-[0_24px_50px_rgba(31,41,55,0.16)] flex flex-col max-h-[90vh]"
+                  style={{
+                    border: selectedPredictionMatch.isBonus ? '1px solid #fde68a' : '1px solid var(--border)',
+                    background: selectedPredictionMatch.isBonus
+                      ? 'linear-gradient(180deg,#fffbeb 0%,#ffffff 120px)'
+                      : '#ffffff',
+                  }}
+                >
+                  <div className="flex items-start justify-between border-b pb-3 mb-4 gap-4" style={{ borderColor: selectedPredictionMatch.isBonus ? '#fde68a' : 'var(--border)' }}>
                     <div>
                       <h3 className="text-[17px] font-bold text-foreground flex items-center gap-2">
                         {t("adminPredictionModalTitle")}

@@ -19,7 +19,7 @@ interface Match {
   homeTeam: Team; awayTeam: Team;
 }
 interface LeagueMatch {
-  id: string; status: string; isPredictionEnabled: boolean; lockAt: string; match: Match;
+  id: string; status: string; isPredictionEnabled: boolean; isBonus: boolean; lockAt: string; match: Match;
   myPrediction: { id: string; homeScorePred: number; awayScorePred: number; isHopeStar: boolean; points: number; resultType: string; } | null;
 }
 
@@ -185,7 +185,10 @@ export default function MatchDetailPage() {
               boxShadow: '0 1px 4px rgba(0,0,0,0.12)',
             }}>
               <div className="flex items-center justify-between mb-5 opacity-85 text-[13px]">
-                <span>{stageLabel} · {lm.match.homeTeam.name} vs {lm.match.awayTeam.name}</span>
+                <span className="flex items-center gap-2">
+                  {stageLabel} · {lm.match.homeTeam.name} vs {lm.match.awayTeam.name}
+                  {lm.isBonus && <span className="text-[10px] font-extrabold bg-amber-300/80 text-amber-900 px-1.5 py-0.5 rounded">BONUS</span>}
+                </span>
                 <span className="kp-badge" style={{ background: 'rgba(255,255,255,0.2)', color: '#fff', padding: '4px 14px', fontSize: '12px' }}>
                   {t("statusFinal")}
                 </span>
@@ -260,10 +263,19 @@ export default function MatchDetailPage() {
           /* ─── OPEN State ─── */
           <>
             {/* Match Header Card */}
-            <div className="kp-card mb-5" style={{ border: isOpen ? '2px solid #DCFCE7' : '1px solid var(--border)', borderRadius: '12px', padding: '28px 32px' }}>
+            <div className="kp-card mb-5" style={{
+              borderLeft: lm.isBonus ? '4px solid #f59e0b' : isOpen ? undefined : undefined,
+              border: lm.isBonus ? '1px solid #fde68a' : isOpen ? '2px solid #DCFCE7' : '1px solid var(--border)',
+              borderRadius: '12px',
+              padding: '28px 32px',
+              background: lm.isBonus ? 'linear-gradient(180deg,#fffbeb 0%,#ffffff 60%)' : undefined,
+            }}>
               <div className="flex items-center justify-between mb-6">
                 <div>
-                  <div className="text-[16px] font-bold text-foreground mb-1">{stageLabel}</div>
+                  <div className="text-[16px] font-bold text-foreground mb-1 flex items-center gap-2">
+                    {stageLabel}
+                    {lm.isBonus && <span className="text-[11px] font-extrabold bg-amber-100 text-amber-700 border border-amber-300 px-2 py-0.5 rounded">BONUS</span>}
+                  </div>
                   <div className="text-[13px] text-muted-foreground">
                     {lm.match.stage === "GROUP" ? t("internalGroupStageDesc") : t("internalLeagueDesc")}
                   </div>
@@ -299,7 +311,13 @@ export default function MatchDetailPage() {
 
             {/* Prediction Form */}
             {isOpen && (
-              <div className="kp-card mb-5" style={{ borderRadius: '12px', padding: '24px 28px' }}>
+              <div className="kp-card mb-5" style={{
+                borderRadius: '12px',
+                padding: '24px 28px',
+                borderLeft: lm.isBonus ? '4px solid #f59e0b' : undefined,
+                border: lm.isBonus ? '1px solid #fde68a' : undefined,
+                background: lm.isBonus ? 'linear-gradient(180deg,#fffbeb 0%,#ffffff 60%)' : undefined,
+              }}>
                 <div className="flex items-center justify-between mb-1">
                   <div className="text-[16px] font-bold text-foreground">
                     {t("yourPredictionTitle")}

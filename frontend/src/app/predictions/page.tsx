@@ -129,7 +129,15 @@ export default function PredictionsPage() {
 
             return (
               <Link key={lm.id} href={`/matches/${lm.id}`} className="block">
-                <div className="kp-card flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 hover:shadow-md transition-shadow" style={{ padding: '14px 18px' }}>
+                <div
+                  className="kp-card flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 hover:shadow-md transition-shadow"
+                  style={{
+                    padding: '14px 18px',
+                    borderLeft: lm.isBonus ? '4px solid #f59e0b' : undefined,
+                    border: lm.isBonus ? '1px solid #fde68a' : undefined,
+                    background: lm.isBonus ? 'linear-gradient(180deg,#fffbeb 0%,#ffffff 60%)' : undefined,
+                  }}
+                >
                   {/* Teams */}
                   <div className="w-full sm:flex-1 min-w-0">
                     <div className="text-[14px] font-semibold text-foreground flex items-center gap-2 flex-wrap">
