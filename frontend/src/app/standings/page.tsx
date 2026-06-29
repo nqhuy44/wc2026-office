@@ -133,9 +133,13 @@ const BKT_CARD_H  = 110;  // match card height: header 26 + row 41 + div 1 + row
 const BKT_COL_GAP = 48;   // gap between columns (connector area)
 const BKT_TOTAL_H = 16 * BKT_SLOT; // 2016px
 
+// Visual order matches the actual WC2026 bracket layout (verified from provider schedule).
+// Each adjacent pair of R32 slots feeds the same R16 match (connector logic pairs i, i+1 → next round i/2).
+// R32:  [75,76]→M90, [73,74]→M89, [80,79]→M92, [78,77]→M91, [81,82]→M93, [83,84]→M94, [87,88]→M96, [86,85]→M95
+// R16:  [90,89]→M97, [92,91]→M98, [93,94]→M99, [96,95]→M100
 const BRACKET_ROUND_DEFS = [
-  { labelVi: "Round of 32",  labelEn: "Round of 32",    matchNos: [73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88] },
-  { labelVi: "Vòng 16 đội",  labelEn: "Round of 16",    matchNos: [89, 90, 91, 92, 93, 94, 95, 96] },
+  { labelVi: "Round of 32",  labelEn: "Round of 32",    matchNos: [75, 76, 73, 74, 80, 79, 78, 77, 81, 82, 83, 84, 87, 88, 86, 85] },
+  { labelVi: "Vòng 16 đội",  labelEn: "Round of 16",    matchNos: [90, 89, 92, 91, 93, 94, 96, 95] },
   { labelVi: "Tứ kết",       labelEn: "Quarter-finals",  matchNos: [97, 98, 99, 100] },
   { labelVi: "Bán kết",      labelEn: "Semi-finals",     matchNos: [101, 102] },
   { labelVi: "Chung kết",    labelEn: "Final",           matchNos: [104] },
