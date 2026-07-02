@@ -13,6 +13,7 @@ interface Team { id: string; name: string; shortName: string; flagUrl: string; }
 interface Match {
   id: string; stage: string; groupName: string | null; kickoffAt: string;
   homeScore: number | null; awayScore: number | null;
+  regularTimeHome: number | null; regularTimeAway: number | null;
   extraTimeHome: number | null; extraTimeAway: number | null;
   penaltiesHome: number | null; penaltiesAway: number | null;
   duration: string | null;
@@ -206,22 +207,15 @@ export default function MatchDetailPage() {
                         <div className="text-[52px] font-black" style={{ letterSpacing: '6px' }}>
                           {sc.homeMain} — {sc.awayMain}
                         </div>
-                        {sc.suffix === "aet" && sc.homeET !== null && (
-                          <div className="text-[18px] font-bold opacity-75 mt-1">
-                            {sc.homeET} — {sc.awayET}
-                            <span className="text-[13px] ml-1.5 font-semibold opacity-70 uppercase tracking-widest">AET</span>
+                        {(sc.suffix === "aet" || sc.suffix === "pen") && sc.home90 !== null && (
+                          <div className="text-[18px] font-bold opacity-70 mt-1">
+                            90': {sc.home90} — {sc.away90}
                           </div>
                         )}
-                        {sc.suffix === "pen" && sc.homeET !== null && (
-                          <>
-                            <div className="text-[18px] font-bold opacity-75 mt-1">
-                              {sc.homeET} — {sc.awayET}
-                              <span className="text-[13px] ml-1.5 font-semibold opacity-70 uppercase tracking-widest">AET</span>
-                            </div>
-                            <div className="text-[16px] font-extrabold opacity-90 mt-0.5">
-                              ({sc.homePen}) — ({sc.awayPen}) PEN
-                            </div>
-                          </>
+                        {sc.suffix === "pen" && (
+                          <div className="text-[16px] font-extrabold opacity-90 mt-0.5">
+                            ({sc.homePen}) — ({sc.awayPen}) PEN
+                          </div>
                         )}
                         <div className="text-[13px] opacity-70 font-semibold uppercase tracking-widest mt-1">
                           {sc.suffix ? "AFTER EXTRA TIME" : t("fullTimeLabel")}

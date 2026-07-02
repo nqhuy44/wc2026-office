@@ -11,7 +11,7 @@ import TeamLogo from "@/components/team-logo";
 import { parseScore } from "@/lib/match-score";
 
 interface Team { id: string; name: string; shortName: string; flagUrl: string; }
-interface Match { id: string; stage: string; groupName: string | null; kickoffAt: string; homeScore: number | null; awayScore: number | null; extraTimeHome: number | null; extraTimeAway: number | null; penaltiesHome: number | null; penaltiesAway: number | null; duration: string | null; homeTeam: Team; awayTeam: Team; }
+interface Match { id: string; stage: string; groupName: string | null; kickoffAt: string; homeScore: number | null; awayScore: number | null; regularTimeHome: number | null; regularTimeAway: number | null; extraTimeHome: number | null; extraTimeAway: number | null; penaltiesHome: number | null; penaltiesAway: number | null; duration: string | null; homeTeam: Team; awayTeam: Team; }
 interface LeagueMatch {
   id: string; status: string; isPredictionEnabled: boolean; isBonus: boolean; lockAt: string; match: Match;
   myPrediction: { homeScorePred: number; awayScorePred: number; isHopeStar: boolean; points: number; resultType: string; } | null;
@@ -199,18 +199,15 @@ function MatchesContent() {
                                 {isLive && <div className="text-[12px] text-destructive font-bold mt-0.5">{t("inProgressStatus")}</div>}
                                 {isScored && (
                                   <div className="flex flex-col items-center gap-0.5 mt-0.5">
-                                    {sc.suffix === "aet" && sc.homeET !== null && (
+                                    {(sc.suffix === "aet" || sc.suffix === "pen") && sc.home90 !== null && (
                                       <span className="text-[10px] font-bold text-gray-500">
-                                        {sc.homeET}—{sc.awayET} AET
+                                        90': {sc.home90}—{sc.away90}
                                       </span>
                                     )}
-                                    {sc.suffix === "pen" && sc.homeET !== null && (
-                                      <>
-                                        <span className="text-[10px] font-bold text-gray-500">{sc.homeET}—{sc.awayET} AET</span>
-                                        <span className="text-[10px] font-extrabold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">
-                                          ({sc.homePen})—({sc.awayPen}) PEN
-                                        </span>
-                                      </>
+                                    {sc.suffix === "pen" && (
+                                      <span className="text-[10px] font-extrabold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">
+                                        ({sc.homePen})—({sc.awayPen}) PEN
+                                      </span>
                                     )}
                                     <span className="text-[11px] text-muted-foreground">
                                       {sc.suffix ? "AET" : "FT"}

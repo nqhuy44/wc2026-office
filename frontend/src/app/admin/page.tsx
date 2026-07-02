@@ -50,6 +50,8 @@ interface Match {
   kickoffAt: string;
   homeScore: number | null;
   awayScore: number | null;
+  regularTimeHome: number | null;
+  regularTimeAway: number | null;
   extraTimeHome: number | null;
   extraTimeAway: number | null;
   penaltiesHome: number | null;

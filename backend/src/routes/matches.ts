@@ -54,6 +54,8 @@ export async function matchRoutes(app: FastifyInstance) {
         kickoffAt: lm.match.kickoffAt,
         homeScore: lm.match.homeScore,
         awayScore: lm.match.awayScore,
+        regularTimeHome: lm.match.regularTimeHome,
+        regularTimeAway: lm.match.regularTimeAway,
         extraTimeHome: lm.match.extraTimeHome,
         extraTimeAway: lm.match.extraTimeAway,
         penaltiesHome: lm.match.penaltiesHome,

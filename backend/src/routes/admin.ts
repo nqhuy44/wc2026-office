@@ -599,6 +599,10 @@ export async function adminRoutes(app: FastifyInstance) {
       .filter(lm =>
         lm.match.providerHomeScore !== null &&
         lm.match.providerAwayScore !== null &&
+        // For ET/pen matches providerHomeScore stores 90-min score, so it will always
+        // differ from homeScore (final total). Skip those — no discrepancy to fix.
+        lm.match.extraTimeHome === null &&
+        lm.match.extraTimeAway === null &&
         (lm.match.providerHomeScore !== lm.match.homeScore ||
           lm.match.providerAwayScore !== lm.match.awayScore)
       )
@@ -679,16 +683,6 @@ export async function adminRoutes(app: FastifyInstance) {
 
     if (leagueMatch.match.status !== "SCORED") {
       return reply.status(400).send({ error: "Bad Request", code: "errMatchNotScored" });
-    }
-
-    // Fix homeScore to regularTimeHome if they differ (ET score stored as homeScore)
-    const { regularTimeHome, regularTimeAway, homeScore, awayScore } = leagueMatch.match as any;
-    if (regularTimeHome !== null && regularTimeAway !== null &&
-        (regularTimeHome !== homeScore || regularTimeAway !== awayScore)) {
-      await prisma.match.update({
-        where: { id: matchId },
-        data: { homeScore: regularTimeHome, awayScore: regularTimeAway }
-      });
     }
 
     await scoreMatch(matchId);

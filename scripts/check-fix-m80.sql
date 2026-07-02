@@ -1,86 +1,61 @@
 -- =============================================================================
--- Step 1: Check Belgium-Senegal (M80) — verify homeScore vs regularTimeHome
+-- Step 1: Check Belgium-Senegal (M80)
 -- =============================================================================
 SELECT
   m.id,
-  m.external_match_id,
-  ht.name AS home_team,
-  at.name AS away_team,
-  m.home_score        AS "homeScore (used for scoring)",
-  m.away_score        AS "awayScore",
-  m.regular_time_home AS "regularTimeHome (90-min, authoritative)",
-  m.regular_time_away AS "regularTimeAway",
-  m.extra_time_home   AS "extraTimeHome (ET cumulative)",
-  m.extra_time_away   AS "extraTimeAway",
-  m.penalties_home,
-  m.penalties_away,
+  m."externalMatchId",
+  ht.name AS home,
+  at.name AS away,
+  m."homeScore",
+  m."awayScore",
+  m."regularTimeHome",
+  m."regularTimeAway",
+  m."extraTimeHome",
+  m."extraTimeAway",
   m.duration,
   m.status,
   m.winner
 FROM "Match" m
-JOIN "Team" ht ON ht.id = m.home_team_id
-JOIN "Team" at ON at.id = m.away_team_id
-WHERE ht.name ILIKE '%belgium%' OR at.name ILIKE '%senegal%'
-   OR ht.name ILIKE '%belgique%' OR at.name ILIKE '%sénégal%';
+JOIN "Team" ht ON ht.id = m."homeTeamId"
+JOIN "Team" at ON at.id = m."awayTeamId"
+WHERE ht.name ILIKE '%belgium%' OR at.name ILIKE '%senegal%';
 
--- If homeScore != regularTimeHome, homeScore is wrong (ET score was stored instead of 90-min).
--- Fix it:
+-- If homeScore != regularTimeHome, run this UPDATE then call force-rescore:
 -- UPDATE "Match"
--- SET home_score = regular_time_home,
---     away_score = regular_time_away
--- WHERE external_match_id = '<id from above>'
---   AND regular_time_home IS NOT NULL;
--- Then call /admin/matches/<matchId>/force-rescore to re-score predictions.
+-- SET "homeScore" = "regularTimeHome",
+--     "awayScore" = "regularTimeAway"
+-- WHERE "externalMatchId" = '<value from above>'
+--   AND "regularTimeHome" IS NOT NULL;
 
 -- =============================================================================
--- Step 2: Determine correct R16 externalMatchId → template slot mapping
--- Run this to see which actual DB R16 match corresponds to which R16 slot
+-- Step 2: R16 slot mapping (paste output to fix KNOCKOUT_TEMPLATES)
 -- =============================================================================
 SELECT
-  m.external_match_id,
-  m.kickoff_at,
+  m."externalMatchId",
+  m."kickoffAt",
   ht.name AS home_team,
   at.name AS away_team,
   m.status
 FROM "Match" m
-JOIN "Team" ht ON ht.id = m.home_team_id
-JOIN "Team" at ON at.id = m.away_team_id
+JOIN "Team" ht ON ht.id = m."homeTeamId"
+JOIN "Team" at ON at.id = m."awayTeamId"
 WHERE m.stage = 'ROUND_OF_16'
-ORDER BY CAST(m.external_match_id AS BIGINT) ASC;
-
--- The output rows (sorted by externalMatchId) map to templates slots 89, 90, 91, 92, 93, 94, 95, 96
--- in that order in the current code. If the teams in a row don't match what the template
--- expects for that slot, the mapping is wrong and needs to be corrected.
---
--- Expected template assignments (based on WC2026 bracket):
---   Slot 89 → winner(M73) vs winner(M74)
---   Slot 90 → winner(M75) vs winner(M76)
---   Slot 91 → winner(M77) vs winner(M78)  [Spain/Austria vs Portugal/Croatia]
---   Slot 92 → winner(M79) vs winner(M80)  [USA vs Belgium ← this is KNOWN correct]
---   Slot 93 → winner(M81) vs winner(M82)  [Brazil vs Norway ← provider puts this at position 2!]
---   Slot 94 → winner(M83) vs winner(M84)
---   Slot 95 → winner(M85) vs winner(M86)
---   Slot 96 → winner(M87) vs winner(M88)
---
--- If row 3 (0-indexed: 2) shows Brazil-Norway (should be slot 93, not 91),
--- and row 4 shows USA-Belgium (slot 92, correct), then the provider order is:
--- [89, 90, 93, 92, 91, ?, ?, ?]
--- Report back the full list so we can fix KNOCKOUT_TEMPLATES ordering.
+ORDER BY CAST(m."externalMatchId" AS BIGINT) ASC;
 
 -- =============================================================================
--- Step 3: Check predictions that were scored wrong for Belgium-Senegal
+-- Step 3: Check predictions scored wrong for Belgium-Senegal
 -- =============================================================================
 -- SELECT
---   m2.name AS member,
---   p.home_score_pred,
---   p.away_score_pred,
---   p.result_type,
+--   mb.name AS member,
+--   p."homeScorePred",
+--   p."awayScorePred",
+--   p."resultType",
 --   p.points,
---   p.is_hope_star,
---   lm.is_bonus
+--   p."isHopeStar",
+--   lm."isBonus"
 -- FROM "Prediction" p
--- JOIN "LeagueMatch" lm ON lm.id = p.league_match_id
--- JOIN "Match" mat ON mat.id = lm.match_id
--- JOIN "Member" m2 ON m2.id = p.member_id
--- WHERE mat.external_match_id = '<id from Step 1>'
--- ORDER BY p.result_type;
+-- JOIN "LeagueMatch" lm ON lm.id = p."leagueMatchId"
+-- JOIN "Match" mat ON mat.id = lm."matchId"
+-- JOIN "Member" mb ON mb.id = p."memberId"
+-- WHERE mat."externalMatchId" = '<value from Step 1>'
+-- ORDER BY p."resultType";

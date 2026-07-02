@@ -26,6 +26,8 @@ interface Match {
   awayTeam: Team;
   homeScore: number | null;
   awayScore: number | null;
+  regularTimeHome: number | null;
+  regularTimeAway: number | null;
   extraTimeHome: number | null;
   extraTimeAway: number | null;
   penaltiesHome: number | null;
@@ -448,14 +450,11 @@ export default function DashboardPage() {
                           <div className="text-[36px] font-black tracking-wider px-4" style={{ letterSpacing: '3px' }}>
                             {sc.homeMain} — {sc.awayMain}
                           </div>
-                          {sc.suffix === "aet" && sc.homeET !== null && (
-                            <div className="text-[11px] font-bold text-gray-500">{sc.homeET}—{sc.awayET} AET</div>
+                          {(sc.suffix === "aet" || sc.suffix === "pen") && sc.home90 !== null && (
+                            <div className="text-[11px] font-bold text-gray-500">90': {sc.home90}—{sc.away90}</div>
                           )}
-                          {sc.suffix === "pen" && sc.homeET !== null && (
-                            <>
-                              <div className="text-[11px] font-bold text-gray-500">{sc.homeET}—{sc.awayET} AET</div>
-                              <div className="text-[11px] font-extrabold text-amber-700">({sc.homePen})—({sc.awayPen}) PEN</div>
-                            </>
+                          {sc.suffix === "pen" && (
+                            <div className="text-[11px] font-extrabold text-amber-700">({sc.homePen})—({sc.awayPen}) PEN</div>
                           )}
                         </>
                       );

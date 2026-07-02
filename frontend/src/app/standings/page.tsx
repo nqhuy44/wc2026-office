@@ -230,9 +230,9 @@ function BracketCard({ match, language }: { match: ResolvedKnockoutMatch; langua
         </div>
         <span style={{ fontSize: 10, color: "#9ca3af" }}>{dateStr}</span>
       </div>
-      {renderRow(match.home, match.homeScore, match.extraTimeHome, match.penaltiesHome, homeWon)}
+      {renderRow(match.home, match.homeScore, null, match.penaltiesHome, homeWon)}
       <div style={{ height: 1, background: "#f3f4f6" }} />
-      {renderRow(match.away, match.awayScore, match.extraTimeAway, match.penaltiesAway, awayWon)}
+      {renderRow(match.away, match.awayScore, null, match.penaltiesAway, awayWon)}
     </div>
   );
 }
@@ -602,9 +602,17 @@ export default function StandingsPage() {
         .filter((lm) => lm.match.stage === round.key)
         .sort((a, b) => parseInt(a.match.externalMatchId ?? "0", 10) - parseInt(b.match.externalMatchId ?? "0", 10));
 
+      // R16: provider's externalMatchId order ≠ sequential template slot order.
+      // Verified from DB: provider assigns R16 IDs in slot order [89,90,93,94,91,92,96,95].
+      const R16_SLOT_ORDER = [89, 90, 93, 94, 91, 92, 96, 95];
       const stageTemplates = KNOCKOUT_TEMPLATES
         .filter((t) => t.stage === round.key)
-        .sort((a, b) => a.no - b.no);
+        .sort((a, b) => {
+          if (round.key === "ROUND_OF_16") {
+            return R16_SLOT_ORDER.indexOf(a.no) - R16_SLOT_ORDER.indexOf(b.no);
+          }
+          return a.no - b.no;
+        });
 
       stageActuals.forEach((actual, i) => {
         if (i < stageTemplates.length) actualByNo.set(stageTemplates[i].no, actual);

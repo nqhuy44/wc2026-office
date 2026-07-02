@@ -10,7 +10,7 @@ import TeamLogo from "@/components/team-logo";
 import { parseScore } from "@/lib/match-score";
 
 interface Team { id: string; name: string; shortName: string; flagUrl: string; }
-interface Match { id: string; stage: string; groupName: string | null; kickoffAt: string; homeScore: number | null; awayScore: number | null; extraTimeHome: number | null; extraTimeAway: number | null; penaltiesHome: number | null; penaltiesAway: number | null; duration: string | null; homeTeam: Team; awayTeam: Team; }
+interface Match { id: string; stage: string; groupName: string | null; kickoffAt: string; homeScore: number | null; awayScore: number | null; regularTimeHome: number | null; regularTimeAway: number | null; extraTimeHome: number | null; extraTimeAway: number | null; penaltiesHome: number | null; penaltiesAway: number | null; duration: string | null; homeTeam: Team; awayTeam: Team; }
 interface LeagueMatch {
   id: string; status: string; isPredictionEnabled: boolean; isBonus: boolean; lockAt: string; match: Match;
   myPrediction: { homeScorePred: number; awayScorePred: number; isHopeStar: boolean; points: number; resultType: string; } | null;
@@ -172,14 +172,11 @@ export default function PredictionsPage() {
                           return (
                             <div className="flex flex-col items-end sm:items-center">
                               <div className="text-[16px] font-black">{sc.homeMain} – {sc.awayMain}</div>
-                              {sc.suffix === "aet" && sc.homeET !== null && (
-                                <span className="text-[9px] font-bold text-gray-500">{sc.homeET}-{sc.awayET} AET</span>
+                              {(sc.suffix === "aet" || sc.suffix === "pen") && sc.home90 !== null && (
+                                <span className="text-[9px] font-bold text-gray-500">90': {sc.home90}-{sc.away90}</span>
                               )}
-                              {sc.suffix === "pen" && sc.homeET !== null && (
-                                <>
-                                  <span className="text-[9px] font-bold text-gray-500">{sc.homeET}-{sc.awayET} AET</span>
-                                  <span className="text-[10px] font-extrabold text-amber-700">({sc.homePen}-{sc.awayPen}) PEN</span>
-                                </>
+                              {sc.suffix === "pen" && (
+                                <span className="text-[10px] font-extrabold text-amber-700">({sc.homePen}-{sc.awayPen}) PEN</span>
                               )}
                             </div>
                           );
