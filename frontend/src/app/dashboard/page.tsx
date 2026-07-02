@@ -450,8 +450,8 @@ export default function DashboardPage() {
                           <div className="text-[36px] font-black tracking-wider px-4" style={{ letterSpacing: '3px' }}>
                             {sc.homeMain} — {sc.awayMain}
                           </div>
-                          {(sc.suffix === "aet" || sc.suffix === "pen") && sc.home90 !== null && (
-                            <div className="text-[11px] font-bold text-gray-500">90': {sc.home90}—{sc.away90}</div>
+                          {(sc.suffix === "aet" || sc.suffix === "pen") && sc.homeAET !== null && (
+                            <div className="text-[11px] font-bold text-gray-500">AET {sc.homeAET}—{sc.awayAET}</div>
                           )}
                           {sc.suffix === "pen" && (
                             <div className="text-[11px] font-extrabold text-amber-700">({sc.homePen})—({sc.awayPen}) PEN</div>

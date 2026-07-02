@@ -172,8 +172,8 @@ export default function PredictionsPage() {
                           return (
                             <div className="flex flex-col items-end sm:items-center">
                               <div className="text-[16px] font-black">{sc.homeMain} – {sc.awayMain}</div>
-                              {(sc.suffix === "aet" || sc.suffix === "pen") && sc.home90 !== null && (
-                                <span className="text-[9px] font-bold text-gray-500">90': {sc.home90}-{sc.away90}</span>
+                              {(sc.suffix === "aet" || sc.suffix === "pen") && sc.homeAET !== null && (
+                                <span className="text-[9px] font-bold text-gray-500">AET {sc.homeAET}-{sc.awayAET}</span>
                               )}
                               {sc.suffix === "pen" && (
                                 <span className="text-[10px] font-extrabold text-amber-700">({sc.homePen}-{sc.awayPen}) PEN</span>

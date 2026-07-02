@@ -207,9 +207,10 @@ export default function MatchDetailPage() {
                         <div className="text-[52px] font-black" style={{ letterSpacing: '6px' }}>
                           {sc.homeMain} — {sc.awayMain}
                         </div>
-                        {(sc.suffix === "aet" || sc.suffix === "pen") && sc.home90 !== null && (
-                          <div className="text-[18px] font-bold opacity-70 mt-1">
-                            90': {sc.home90} — {sc.away90}
+                        {(sc.suffix === "aet" || sc.suffix === "pen") && sc.homeAET !== null && (
+                          <div className="text-[18px] font-bold opacity-75 mt-1">
+                            {sc.homeAET} — {sc.awayAET}
+                            <span className="text-[13px] ml-1.5 font-semibold opacity-70 uppercase tracking-widest">AET</span>
                           </div>
                         )}
                         {sc.suffix === "pen" && (
@@ -218,7 +219,7 @@ export default function MatchDetailPage() {
                           </div>
                         )}
                         <div className="text-[13px] opacity-70 font-semibold uppercase tracking-widest mt-1">
-                          {sc.suffix ? "AFTER EXTRA TIME" : t("fullTimeLabel")}
+                          {t("fullTimeLabel")}
                         </div>
                       </>
                     );

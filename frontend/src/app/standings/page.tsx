@@ -21,6 +21,8 @@ interface Match {
   kickoffAt: string;
   homeScore: number | null;
   awayScore: number | null;
+  regularTimeHome: number | null;
+  regularTimeAway: number | null;
   extraTimeHome: number | null;
   extraTimeAway: number | null;
   penaltiesHome: number | null;
@@ -105,6 +107,8 @@ interface ResolvedKnockoutMatch {
   away: ResolvedEntrant;
   homeScore: number | null;
   awayScore: number | null;
+  regularTimeHome: number | null;
+  regularTimeAway: number | null;
   extraTimeHome: number | null;
   extraTimeAway: number | null;
   penaltiesHome: number | null;
@@ -177,7 +181,11 @@ function BracketCard({ match, language }: { match: ResolvedKnockoutMatch; langua
       })()
     : "TBD";
 
-  const renderRow = (entrant: ResolvedEntrant, main: number | null, et: number | null, pen: number | null, won: boolean) => (
+  const hasExtra = hasET || hasPen;
+  const homeMain90 = hasExtra ? (match.regularTimeHome ?? match.homeScore) : match.homeScore;
+  const awayMain90 = hasExtra ? (match.regularTimeAway ?? match.awayScore) : match.awayScore;
+
+  const renderRow = (entrant: ResolvedEntrant, main90: number | null, aetTotal: number | null, pen: number | null, won: boolean) => (
     <div style={{ height: 41, display: "flex", alignItems: "center", gap: 6, padding: "0 10px", background: won ? "#f0fdf4" : "transparent" }}>
       {entrant.team ? (
         entrant.team.flagUrl
@@ -191,21 +199,21 @@ function BracketCard({ match, language }: { match: ResolvedKnockoutMatch; langua
       <span style={{ fontSize: 12, fontWeight: won ? 700 : 500, color: won ? "#111827" : "#374151", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
         {entrant.team?.name ?? entrant.label}
       </span>
-      <div style={{ display: "flex", alignItems: "center", gap: 3, flexShrink: 0 }}>
-        {/* 90-min score (primary) */}
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 1, flexShrink: 0 }}>
+        {/* 90-min score (primary, big) */}
         <span style={{ fontSize: 14, fontWeight: 900, color: won ? "#15803d" : scored ? "#111827" : "#d1d5db", minWidth: 14, textAlign: "right" }}>
-          {main !== null ? main : "—"}
+          {main90 !== null ? main90 : "—"}
         </span>
-        {/* ET cumulative shown as arrow suffix */}
-        {et !== null && (
-          <span style={{ fontSize: 9, fontWeight: 800, color: won ? "#15803d" : "#9ca3af" }}>
-            →{et}
+        {/* AET total shown below as small secondary */}
+        {aetTotal !== null && (
+          <span style={{ fontSize: 8, fontWeight: 700, color: won ? "#15803d" : "#9ca3af", lineHeight: "10px" }}>
+            {aetTotal} AET
           </span>
         )}
         {/* Penalty goals */}
         {pen !== null && (
-          <span style={{ fontSize: 9, fontWeight: 800, color: won ? "#15803d" : "#6b7280", background: won ? "#dcfce7" : "#f3f4f6", border: `1px solid ${won ? "#86efac" : "#e5e7eb"}`, borderRadius: 3, padding: "0 3px", lineHeight: "14px" }}>
-            ({pen})
+          <span style={{ fontSize: 8, fontWeight: 800, color: won ? "#15803d" : "#6b7280", background: won ? "#dcfce7" : "#f3f4f6", border: `1px solid ${won ? "#86efac" : "#e5e7eb"}`, borderRadius: 3, padding: "0 3px", lineHeight: "12px" }}>
+            ({pen})p
           </span>
         )}
       </div>
@@ -230,9 +238,9 @@ function BracketCard({ match, language }: { match: ResolvedKnockoutMatch; langua
         </div>
         <span style={{ fontSize: 10, color: "#9ca3af" }}>{dateStr}</span>
       </div>
-      {renderRow(match.home, match.homeScore, null, match.penaltiesHome, homeWon)}
+      {renderRow(match.home, homeMain90, hasExtra ? match.homeScore : null, match.penaltiesHome, homeWon)}
       <div style={{ height: 1, background: "#f3f4f6" }} />
-      {renderRow(match.away, match.awayScore, null, match.penaltiesAway, awayWon)}
+      {renderRow(match.away, awayMain90, hasExtra ? match.awayScore : null, match.penaltiesAway, awayWon)}
     </div>
   );
 }
@@ -649,6 +657,8 @@ export default function StandingsPage() {
         away: resolveEntrant(template.away, actual?.match.awayTeam),
         homeScore: actual?.match.homeScore ?? null,
         awayScore: actual?.match.awayScore ?? null,
+        regularTimeHome: actual?.match.regularTimeHome ?? null,
+        regularTimeAway: actual?.match.regularTimeAway ?? null,
         extraTimeHome: actual?.match.extraTimeHome ?? null,
         extraTimeAway: actual?.match.extraTimeAway ?? null,
         penaltiesHome: actual?.match.penaltiesHome ?? null,
