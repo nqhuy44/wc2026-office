@@ -4,13 +4,19 @@ import { SCORE_BY_EXTRA_TIME_SETTING_KEY } from "./league-match-state.js";
 function resolveEffectiveScore(match: {
   homeScore: number | null;
   awayScore: number | null;
+  regularTimeHome: number | null;
+  regularTimeAway: number | null;
   extraTimeHome: number | null;
   extraTimeAway: number | null;
 }, useExtraTime: boolean) {
   if (useExtraTime && match.extraTimeHome !== null && match.extraTimeAway !== null) {
     return { home: match.extraTimeHome, away: match.extraTimeAway };
   }
-  return { home: match.homeScore ?? 0, away: match.awayScore ?? 0 };
+  // regularTimeHome is always the authoritative 90-min score from the provider sync
+  // (never gated by alreadyScored, unlike homeScore which only sets on first scoring)
+  const h = match.regularTimeHome ?? match.homeScore ?? 0;
+  const a = match.regularTimeAway ?? match.awayScore ?? 0;
+  return { home: h, away: a };
 }
 
 // Points formula:
@@ -58,8 +64,10 @@ export async function scoreMatch(matchId: string) {
 
     if (!match || match.homeScore === null || match.awayScore === null) return;
 
-    const home90 = match.homeScore;
-    const away90 = match.awayScore;
+    // Use regularTimeHome for the 90-min score (always correct from provider).
+    // homeScore can be stale if it was set before regularTime was available.
+    const home90 = (match as any).regularTimeHome ?? match.homeScore;
+    const away90 = (match as any).regularTimeAway ?? match.awayScore;
     let matchWinner = "DRAW";
     if (home90 > away90) matchWinner = "HOME";
     else if (home90 < away90) matchWinner = "AWAY";

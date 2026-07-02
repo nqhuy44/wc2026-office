@@ -448,10 +448,14 @@ export default function DashboardPage() {
                           <div className="text-[36px] font-black tracking-wider px-4" style={{ letterSpacing: '3px' }}>
                             {sc.homeMain} — {sc.awayMain}
                           </div>
-                          {sc.suffix === "pen" && (
-                            <div className="text-[11px] font-extrabold text-amber-700">
-                              ({sc.homePen}) — ({sc.awayPen}) PEN
-                            </div>
+                          {sc.suffix === "aet" && sc.homeET !== null && (
+                            <div className="text-[11px] font-bold text-gray-500">{sc.homeET}—{sc.awayET} AET</div>
+                          )}
+                          {sc.suffix === "pen" && sc.homeET !== null && (
+                            <>
+                              <div className="text-[11px] font-bold text-gray-500">{sc.homeET}—{sc.awayET} AET</div>
+                              <div className="text-[11px] font-extrabold text-amber-700">({sc.homePen})—({sc.awayPen}) PEN</div>
+                            </>
                           )}
                         </>
                       );

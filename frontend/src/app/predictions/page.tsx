@@ -172,11 +172,14 @@ export default function PredictionsPage() {
                           return (
                             <div className="flex flex-col items-end sm:items-center">
                               <div className="text-[16px] font-black">{sc.homeMain} – {sc.awayMain}</div>
-                              {sc.suffix === "pen" && (
-                                <span className="text-[10px] font-extrabold text-amber-700">({sc.homePen}-{sc.awayPen}) PEN</span>
+                              {sc.suffix === "aet" && sc.homeET !== null && (
+                                <span className="text-[9px] font-bold text-gray-500">{sc.homeET}-{sc.awayET} AET</span>
                               )}
-                              {sc.suffix && (
-                                <span className="text-[9px] text-muted-foreground uppercase">AET</span>
+                              {sc.suffix === "pen" && sc.homeET !== null && (
+                                <>
+                                  <span className="text-[9px] font-bold text-gray-500">{sc.homeET}-{sc.awayET} AET</span>
+                                  <span className="text-[10px] font-extrabold text-amber-700">({sc.homePen}-{sc.awayPen}) PEN</span>
+                                </>
                               )}
                             </div>
                           );

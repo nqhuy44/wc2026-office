@@ -177,14 +177,6 @@ function BracketCard({ match, language }: { match: ResolvedKnockoutMatch; langua
       })()
     : "TBD";
 
-  // Score display: "2" or "2 (aet 3)" or "2 (pen 4)"
-  const scoreLabel = (main: number | null, et: number | null, pen: number | null): string => {
-    if (main === null) return "—";
-    if (pen !== null) return `${main}`;   // show 90-min score; pen shown separately
-    if (et  !== null) return `${et}`;     // show ET (cumulative) score
-    return `${main}`;
-  };
-
   const renderRow = (entrant: ResolvedEntrant, main: number | null, et: number | null, pen: number | null, won: boolean) => (
     <div style={{ height: 41, display: "flex", alignItems: "center", gap: 6, padding: "0 10px", background: won ? "#f0fdf4" : "transparent" }}>
       {entrant.team ? (
@@ -199,10 +191,18 @@ function BracketCard({ match, language }: { match: ResolvedKnockoutMatch; langua
       <span style={{ fontSize: 12, fontWeight: won ? 700 : 500, color: won ? "#111827" : "#374151", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
         {entrant.team?.name ?? entrant.label}
       </span>
-      <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 3, flexShrink: 0 }}>
+        {/* 90-min score (primary) */}
         <span style={{ fontSize: 14, fontWeight: 900, color: won ? "#15803d" : scored ? "#111827" : "#d1d5db", minWidth: 14, textAlign: "right" }}>
-          {scoreLabel(main, et, pen)}
+          {main !== null ? main : "—"}
         </span>
+        {/* ET cumulative shown as arrow suffix */}
+        {et !== null && (
+          <span style={{ fontSize: 9, fontWeight: 800, color: won ? "#15803d" : "#9ca3af" }}>
+            →{et}
+          </span>
+        )}
+        {/* Penalty goals */}
         {pen !== null && (
           <span style={{ fontSize: 9, fontWeight: 800, color: won ? "#15803d" : "#6b7280", background: won ? "#dcfce7" : "#f3f4f6", border: `1px solid ${won ? "#86efac" : "#e5e7eb"}`, borderRadius: 3, padding: "0 3px", lineHeight: "14px" }}>
             ({pen})
@@ -625,7 +625,11 @@ export default function StandingsPage() {
         ref.kind === "winner"
           ? source ? getWinner(source) : undefined
           : source ? getLoser(source) : undefined;
-      return resolved ?? { label: ref.label, team: actualTeam };
+      // For winner/loser refs, do NOT fall back to the actual DB team.
+      // The DB team comes from the provider's R16 slot, which may be mapped to the wrong
+      // template slot (provider's R16 externalMatchId order ≠ template slot order).
+      // Correct teams are derived only from the resolved R32 result.
+      return resolved ?? { label: ref.label };
     };
 
     KNOCKOUT_TEMPLATES.forEach((template) => {

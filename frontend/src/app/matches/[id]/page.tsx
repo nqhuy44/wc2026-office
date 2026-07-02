@@ -206,13 +206,25 @@ export default function MatchDetailPage() {
                         <div className="text-[52px] font-black" style={{ letterSpacing: '6px' }}>
                           {sc.homeMain} — {sc.awayMain}
                         </div>
-                        {sc.suffix === "pen" && (
-                          <div className="text-[16px] font-extrabold opacity-90 mt-1">
-                            ({sc.homePen}) — ({sc.awayPen}) PEN
+                        {sc.suffix === "aet" && sc.homeET !== null && (
+                          <div className="text-[18px] font-bold opacity-75 mt-1">
+                            {sc.homeET} — {sc.awayET}
+                            <span className="text-[13px] ml-1.5 font-semibold opacity-70 uppercase tracking-widest">AET</span>
                           </div>
                         )}
+                        {sc.suffix === "pen" && sc.homeET !== null && (
+                          <>
+                            <div className="text-[18px] font-bold opacity-75 mt-1">
+                              {sc.homeET} — {sc.awayET}
+                              <span className="text-[13px] ml-1.5 font-semibold opacity-70 uppercase tracking-widest">AET</span>
+                            </div>
+                            <div className="text-[16px] font-extrabold opacity-90 mt-0.5">
+                              ({sc.homePen}) — ({sc.awayPen}) PEN
+                            </div>
+                          </>
+                        )}
                         <div className="text-[13px] opacity-70 font-semibold uppercase tracking-widest mt-1">
-                          {sc.suffix === "pen" ? "AET · PENALTIES" : sc.suffix === "aet" ? "AFTER EXTRA TIME" : t("fullTimeLabel")}
+                          {sc.suffix ? "AFTER EXTRA TIME" : t("fullTimeLabel")}
                         </div>
                       </>
                     );

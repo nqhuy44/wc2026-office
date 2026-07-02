@@ -199,13 +199,21 @@ function MatchesContent() {
                                 {isLive && <div className="text-[12px] text-destructive font-bold mt-0.5">{t("inProgressStatus")}</div>}
                                 {isScored && (
                                   <div className="flex flex-col items-center gap-0.5 mt-0.5">
-                                    {sc.suffix === "pen" && (
-                                      <span className="text-[10px] font-extrabold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">
-                                        ({sc.homePen}) — ({sc.awayPen}) PEN
+                                    {sc.suffix === "aet" && sc.homeET !== null && (
+                                      <span className="text-[10px] font-bold text-gray-500">
+                                        {sc.homeET}—{sc.awayET} AET
                                       </span>
                                     )}
+                                    {sc.suffix === "pen" && sc.homeET !== null && (
+                                      <>
+                                        <span className="text-[10px] font-bold text-gray-500">{sc.homeET}—{sc.awayET} AET</span>
+                                        <span className="text-[10px] font-extrabold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">
+                                          ({sc.homePen})—({sc.awayPen}) PEN
+                                        </span>
+                                      </>
+                                    )}
                                     <span className="text-[11px] text-muted-foreground">
-                                      {sc.suffix === "pen" ? "AET" : sc.suffix === "aet" ? "AET" : "FT"}
+                                      {sc.suffix ? "AET" : "FT"}
                                     </span>
                                   </div>
                                 )}

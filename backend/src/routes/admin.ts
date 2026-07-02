@@ -662,6 +662,40 @@ export async function adminRoutes(app: FastifyInstance) {
     return { message: "Đã xác nhận sửa tỉ số và chấm điểm lại thành công!" };
   });
 
+  // Force re-score a SCORED match using regularTimeHome/Away (bypasses providerScore diff check).
+  // Use when homeScore was incorrectly set to ET score and regularTimeHome is correct.
+  app.put("/admin/matches/:matchId/force-rescore", { preHandler: [app.requireAdmin] }, async (request, reply) => {
+    const { matchId } = request.params as { matchId: string };
+    const leagueId = request.leagueMember!.leagueId;
+
+    const leagueMatch = await prisma.leagueMatch.findFirst({
+      where: { leagueId, matchId },
+      include: { match: true }
+    });
+
+    if (!leagueMatch) {
+      return reply.status(404).send({ error: "Not Found", code: "errMatchNotFound" });
+    }
+
+    if (leagueMatch.match.status !== "SCORED") {
+      return reply.status(400).send({ error: "Bad Request", code: "errMatchNotScored" });
+    }
+
+    // Fix homeScore to regularTimeHome if they differ (ET score stored as homeScore)
+    const { regularTimeHome, regularTimeAway, homeScore, awayScore } = leagueMatch.match as any;
+    if (regularTimeHome !== null && regularTimeAway !== null &&
+        (regularTimeHome !== homeScore || regularTimeAway !== awayScore)) {
+      await prisma.match.update({
+        where: { id: matchId },
+        data: { homeScore: regularTimeHome, awayScore: regularTimeAway }
+      });
+    }
+
+    await scoreMatch(matchId);
+
+    return { message: "Đã chấm điểm lại thành công (dùng tỉ số 90 phút)!" };
+  });
+
   // ─── Bonus match toggle (knockout matches only) ───
 
   app.put("/admin/league-matches/:leagueMatchId/toggle-bonus", { preHandler: [app.requireAdmin] }, async (request, reply) => {
