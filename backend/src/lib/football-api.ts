@@ -184,6 +184,22 @@ export async function fetchWorldCupMatches() {
       });
 
       const alreadyScored = existingMatch?.status === 'SCORED';
+
+      // Detect if the provider corrected the 90-min score after we already scored it.
+      // When this happens we must re-run scoreMatch so predictions use the right data.
+      const scoreChangedAfterScoring = alreadyScored &&
+        existingMatch !== null &&
+        periods.regularTimeHome !== null &&
+        periods.regularTimeAway !== null &&
+        (existingMatch.regularTimeHome !== periods.regularTimeHome ||
+         existingMatch.regularTimeAway !== periods.regularTimeAway);
+
+      if (scoreChangedAfterScoring) {
+        console.log(`[rescore] Provider corrected 90-min score for match ${m.id}: ` +
+          `${existingMatch!.regularTimeHome}-${existingMatch!.regularTimeAway} → ` +
+          `${periods.regularTimeHome}-${periods.regularTimeAway}. Will re-score.`);
+      }
+
       const matchRecord = await prisma.match.upsert({
         where: { externalMatchId: String(m.id) },
         update: {
@@ -206,11 +222,11 @@ export async function fetchWorldCupMatches() {
           // providerHomeScore/Away = 90-min score for discrepancy detection.
           providerHomeScore: periods.regularTimeHome,
           providerAwayScore: periods.regularTimeAway,
-          // homeScore/awayScore = 90-min score, only written on first sync.
-          ...(alreadyScored ? {} : {
+          // homeScore/awayScore: written on first sync, OR updated when provider corrects score.
+          ...((!alreadyScored || scoreChangedAfterScoring) ? {
             homeScore: periods.regularTimeHome,
             awayScore: periods.regularTimeAway,
-          }),
+          } : {}),
         },
         create: {
           externalMatchId: String(m.id),
@@ -234,9 +250,11 @@ export async function fetchWorldCupMatches() {
         }
       });
 
-      // Auto-score only when both teams are real and provider marks FINISHED.
-      if (homeTeam.id && awayTeam.id && newStatus === 'FINISHED' && periods.regularTimeHome !== null && periods.regularTimeAway !== null && matchRecord.status !== 'SCORED') {
-        await scoreMatch(matchRecord.id);
+      // Auto-score when: not yet scored, OR provider corrected the 90-min score.
+      if (homeTeam.id && awayTeam.id && newStatus === 'FINISHED' && periods.regularTimeHome !== null && periods.regularTimeAway !== null) {
+        if (!alreadyScored || scoreChangedAfterScoring) {
+          await scoreMatch(matchRecord.id);
+        }
       }
     }
 

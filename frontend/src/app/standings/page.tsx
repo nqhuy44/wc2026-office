@@ -238,9 +238,9 @@ function BracketCard({ match, language }: { match: ResolvedKnockoutMatch; langua
         </div>
         <span style={{ fontSize: 10, color: "#9ca3af" }}>{dateStr}</span>
       </div>
-      {renderRow(match.home, homeMain90, hasExtra ? match.homeScore : null, match.penaltiesHome, homeWon)}
+      {renderRow(match.home, homeMain90, hasExtra ? match.extraTimeHome : null, match.penaltiesHome, homeWon)}
       <div style={{ height: 1, background: "#f3f4f6" }} />
-      {renderRow(match.away, awayMain90, hasExtra ? match.awayScore : null, match.penaltiesAway, awayWon)}
+      {renderRow(match.away, awayMain90, hasExtra ? match.extraTimeAway : null, match.penaltiesAway, awayWon)}
     </div>
   );
 }

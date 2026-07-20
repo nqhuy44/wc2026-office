@@ -1,9 +1,9 @@
 export interface MatchScoreFields {
-  homeScore: number | null;             // final total score (includes ET goals)
+  homeScore: number | null;             // 90-min score (regularTimeHome fallback)
   awayScore: number | null;
   regularTimeHome?: number | null;      // 90-min score only
   regularTimeAway?: number | null;
-  extraTimeHome?: number | null;        // goals scored in ET period only (not cumulative)
+  extraTimeHome?: number | null;        // cumulative score at end of ET (includes 90-min goals)
   extraTimeAway?: number | null;
   penaltiesHome?: number | null;
   penaltiesAway?: number | null;
@@ -14,7 +14,7 @@ export interface ScoreDisplay {
   hasResult: boolean;
   homeMain: number | null;   // 90-min score (the big primary number)
   awayMain: number | null;
-  homeAET: number | null;    // AET total (homeScore); non-null only when match went to ET/pen
+  homeAET: number | null;    // AET total (extraTimeHome cumulative); non-null only when match went to ET/pen
   awayAET: number | null;
   suffix: "aet" | "pen" | null;
   homePen: number | null;
@@ -34,9 +34,9 @@ export function parseScore(m: MatchScoreFields): ScoreDisplay {
   const homeMain = hasExtra ? (m.regularTimeHome ?? m.homeScore) : m.homeScore;
   const awayMain = hasExtra ? (m.regularTimeAway ?? m.awayScore) : m.awayScore;
 
-  // AET total = homeScore (90min + ET goals); shown only when match went beyond 90 min
-  const homeAET = hasExtra ? m.homeScore : null;
-  const awayAET = hasExtra ? m.awayScore : null;
+  // AET total = extraTimeHome (cumulative score at end of ET); shown only when match went beyond 90 min
+  const homeAET = hasExtra ? (m.extraTimeHome ?? null) : null;
+  const awayAET = hasExtra ? (m.extraTimeAway ?? null) : null;
 
   return {
     hasResult: true,
